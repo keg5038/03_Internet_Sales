@@ -34,6 +34,10 @@ df = pd.concat([pd.read_csv(f) for f in glob ('./CSV_Files_2020-02/*.csv')])
 
 df['transaction_date'] = pd.to_datetime(df.transaction_date)
 
+#dropping duplicates in case dates of pulls are messed up
+df = df.drop_duplicates()
+
+
 df2 = df
 #have to sort to ffill
 df = df.sort_values(['transaction_id','transaction_date'])
@@ -47,12 +51,15 @@ df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
 created clean dataframe to get unique list of products
 '''
 
-clean = df[['product_name','product_options','product_weight']].drop_duplicates().sort_values('product_weight')
+clean = df[['product_name','product_options','product_weight','product_price']].drop_duplicates().sort_values('product_weight')
 clean['product_name'] = clean['product_name'].replace('\s+', ' ', regex=True)
 clean['normalized_product'] = np.nan
 clean['brand'] = np.nan
 clean['normalized_units'] = np.nan
 
+
+
+print(clean)
 #read in product map that was created by clean
 lookup = pd.read_excel('product_map_final.xlsx')
 
@@ -98,6 +105,26 @@ y = wop[['transaction_id','transaction_date','shipping_total','product_total','t
 wop.groupby([pd.cut(wop['product_total'],bins=[0,10,20,50,100]),pd.cut(wop['shipping_total'],bins=[0,10,20,30,40,91])])['transaction_id'].nunique().unstack()
 
 '''
+
+'''
+This is to pull info for Andrew
+'''
+x = df.loc[df['transaction_date'].ge('2020')]
+
+a = x.groupby(['transaction_id','transaction_date','product_name']).agg(Retail_Amount = ('product_price','sum'), Quantity = ('product_quantity','sum'))
+
+b = x[['transaction_id','transaction_date','shipping_total','customer_state','customer_postal_code']].drop_duplicates()
+c = pd.merge(a.reset_index('product_name'),b.set_index(['transaction_id','transaction_date']), left_index=True, right_index=True)
+
+c.set_index('product_name',append=True)
+c = c.assign(shipping_discount = lambda x: round(x['shipping_total'] * .85,2))
+c['flat_shipping'] = 10
+c['shipping_difference'] = c['shipping_total'] - c['flat_shipping']
+c['Distributor_Amount'] = np.nan
+c['Retail-Distributor'] = np.nan
+c = c[['Quantity','customer_state','customer_postal_code','Retail_Amount','Distributor_Amount','Retail-Distributor','shipping_total','shipping_discount','flat_shipping','shipping_difference']]
+
+
 
 print(df)
 
