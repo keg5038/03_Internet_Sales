@@ -32,20 +32,39 @@ os.chdir(os.path.join(os.getenv('HOME'),
 
 df = pd.concat([pd.read_csv(f) for f in glob ('./CSV_Files_2020-02/*.csv')])
 
+'''
+Cleaning for Online Orders Sheet
+'''
 df['transaction_date'] = pd.to_datetime(df.transaction_date)
 
 #dropping duplicates in case dates of pulls are messed up
 df = df.drop_duplicates()
-
-
-df2 = df
 #have to sort to ffill
 df = df.sort_values(['transaction_id','transaction_date'])
-
 #way to fillna only based on transaction_id
 df.loc[:,:'category_code'] = df.loc[:,:'category_code'].fillna(df.groupby('transaction_id').ffill())
-
+#cleaning product_name
 df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
+
+'''
+Cleaning FedEx File
+'''
+fed = pd.concat([pd.read_csv(f) for f in glob ('./FedEx_Files/*.csv')])
+
+def date_cleaner(df):
+    #fixes dates for fedex file
+    cols = ['Shipment Date(mm/dd/yyyy)','Shipment Delivery Date (mm/dd/yyyy)','Invoice Date (mm/dd/yyyy)']
+    for col in cols:
+        fed[col] = pd.to_datetime(fed[col],format="%m/%d/%Y")
+
+    return fed
+
+fed = date_cleaner(fed)
+
+fed = fed.rename(columns={'Shipment Date(mm/dd/yyyy)':'Date_Shipment',
+                              'Shipment Delivery Date (mm/dd/yyyy)':'Date_Delivery',
+                              'Invoice Date (mm/dd/yyyy)':'Date_Invoice'})
+fed = fed.drop_duplicates().sort_values('Date_Invoice')
 
 '''
 created clean dataframe to get unique list of products
