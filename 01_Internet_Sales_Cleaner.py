@@ -66,6 +66,8 @@ fed = fed.rename(columns={'Shipment Date(mm/dd/yyyy)':'Date_Shipment',
                               'Invoice Date (mm/dd/yyyy)':'Date_Invoice'})
 fed = fed.drop_duplicates().sort_values('Date_Invoice')
 
+price = pd.read_excel('Product_Pricing.xlsx')
+
 '''
 created clean dataframe to get unique list of products
 '''
@@ -143,7 +145,26 @@ c['Distributor_Amount'] = np.nan
 c['Retail-Distributor'] = np.nan
 c = c[['Quantity','customer_state','customer_postal_code','Retail_Amount','Distributor_Amount','Retail-Distributor','shipping_total','shipping_discount','flat_shipping','shipping_difference']]
 
+'''
+Night of 3/18/20 Stuff
+'''
+#merging 2020 dataframe with price spreadsheet that has distributor price
+y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
+y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
 
+
+#creating dataframe with details
+order_details = y.groupby(['transaction_id','transaction_date','product_name','product_quantity','product_weight','product_options'])\
+    .agg({'product_price':'sum','Distributor_Price':'sum','product_total':'sum'})\
+    .assign(Margin_Per_Product = lambda x: x['product_price'] - x['Distributor_Price'])\
+    .reset_index('product_quantity')\
+    .assign(Total_Margin_Order = lambda x: x['product_quantity'] * x['Margin_Per_Product'])
+
+order_summary_margin = order_details[['product_price','Total_Margin_Order']].groupby(level=[0,1]).sum()
+order_summary_units = y.groupby(['transaction_id','transaction_date'])['combined'].apply(','.join)
+
+order_total = pd.concat([order_summary_margin,order_summary_units],axis=1)
+order_total = order_total[['combined','product_price','Total_Margin_Order']]
 
 print(df)
 
