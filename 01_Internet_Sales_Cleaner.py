@@ -27,11 +27,11 @@ pd.set_option('display.max_columns', 20)
 idx = pd.IndexSlice
 
 os.chdir(os.path.join(os.getenv('HOME'),
-    'Dropbox/1 BKM and CLM/Python/Misc/Online Sales'))
+    'Dropbox/BKM - Marketing/Web Sales'))
 
 
 df = pd.concat([pd.read_csv(f) for f in glob ('./CSV_Files_2020-02/*.csv')])
-
+print(df)
 '''
 Cleaning for Online Orders Sheet
 '''
@@ -48,6 +48,10 @@ df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
 
 #added in because
 df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
+
+#needed to fill in blanks
+df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
+
 
 '''
 Cleaning FedEx File
@@ -79,64 +83,7 @@ Shipping Document - where we pull in from the office sheet
 '''
 ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
                                      'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
-# '''
-# created clean dataframe to get unique list of products
-# '''
-#
-# clean = df[['product_name','product_options','product_weight','product_price']].drop_duplicates().sort_values('product_weight')
-# clean['product_name'] = clean['product_name'].replace('\s+', ' ', regex=True)
-# clean['normalized_product'] = np.nan
-# clean['brand'] = np.nan
-# clean['normalized_units'] = np.nan
-#
-#
-#
-# print(clean)
-# #read in product map that was created by clean
-# lookup = pd.read_excel('product_map_final.xlsx')
-#
-# kg = pd.merge(df,lookup, how='left',on=['product_name','product_options','product_weight'])
-#
-#
-# '''
-# add columns to get total units, total weight, total product sale price for each row
-# '''
-# kg['total_units'] = kg['normalized_units'] * kg['product_quantity']
-# kg['total_weight'] = kg['product_weight'] * kg['product_quantity']
-# kg['product_rev'] = kg['product_price'] * kg['product_quantity']
-#
-# '''
-# couple of transforms to summarize by transaction
-# '''
-# kg['total_weight_order'] = kg.groupby('transaction_id')['total_weight'].transform('sum')
-# kg['total_units_order'] = kg.groupby('transaction_id')['total_units'].transform('sum')
-#
-#
-# '''
-# Cuttting into bins
-# '''
-# #bin for revenue of entire order
-# bins_rev = np.arange(0,kg['product_total'].max()+10,10)
-# kg['rev_bins'] = pd.cut(kg['product_total'],bins=bins_rev)
-#
-#
-# #get dataframe of transactions that have only had Wolff's or Pocono
-# y = kg.loc[kg.brand.isin(["Wolff's","Pocono"])]['transaction_id'].unique()
-#
-# wop = kg.loc[kg.transaction_id.isin(y) & kg.transaction_date.ge('2017')]
-#
-# '''
-# what i was working on that shows
-#
-# #TODO: fix bins to make them make sense
-# #TODO: create heatmap of shipping cost vs. product cost; shipping cost vs. weight
-#
-# y = wop[['transaction_id','transaction_date','shipping_total','product_total','total_weight_order','total_units_order']].drop_duplicates()
-#
-#
-# wop.groupby([pd.cut(wop['product_total'],bins=[0,10,20,50,100]),pd.cut(wop['shipping_total'],bins=[0,10,20,30,40,91])])['transaction_id'].nunique().unstack()
-#
-# '''
+
 
 '''
 This is to pull info for Andrew
@@ -162,8 +109,8 @@ order_details = y.groupby(['transaction_id','transaction_date','customer_last_na
 
 order_details = order_details[['product_quantity','product_price','product_price_x_quantity','Distributor_Price','Margin_Per_Product','Total_Margin_Order']]
 
-order_summary_margin = order_details[['product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1]).sum()
-order_summary_units = y.groupby(['transaction_id','transaction_date'])['combined'].apply(','.join)
+order_summary_margin = order_details[['product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2]).sum()
+order_summary_units = y.groupby(['transaction_id','transaction_date','customer_last_name'])['combined'].apply(', \n'.join)
 
 order_total = pd.concat([order_summary_margin,order_summary_units],axis=1)
 order_total = order_total[['combined','product_price_x_quantity','Total_Margin_Order']]
@@ -184,15 +131,24 @@ order_total_ship_log['Net_Margin'] = \
 
 order_total_ship_log['Positive/Negative'] = np.where(order_total_ship_log['Net_Margin'].ge(0),'Good','Bad')
 
+#summary of actions
+summary = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()]
 
-today = dt.datetime.today().strftime("%m/%d/%Y - %H:%M")
-df_list = [order_total_ship_log, order_details, order_total ]
-df_names = ['Final', 'Details','Backup']
-workbook_name = 'Online Orders as of ' + today + '.xlsx'
+summary = summary[['product_price_x_quantity','Total_Margin_Order','Actual Freight Expense',"Net_Margin"]].sum()
+
+summary = summary.rename({'product_price_x_quantity':'Total Revenue (not including shipping)',
+                          'Total_Margin_Order':'Margin on Product v. Distributor Cost',
+                          'Actual Freight Expense':'Actual Freight Expense',
+                         "Net_Margin" : "Net Margin after Shipping"})
+
+today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
+df_list = [summary, order_total_ship_log, order_details, order_total ]
+df_names = ["Summary",'Margin per Order', 'Details','Backup']
+workbook_name = "Web Orders as of .xlsx"
 
 #merge good
 
-a_fun.dfs_tab(df_list,df_names,workbook_name )
+psota_fun.dfs_tab(df_list,df_names,workbook_name )
 
 print(df)
 
