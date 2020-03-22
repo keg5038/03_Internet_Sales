@@ -91,7 +91,7 @@ ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
 This is to pull info for Andrew
 '''
 # x is just filtered dataframe
-x = df.loc[df['transaction_date'].ge('2020')]
+x = df.loc[df['transaction_date'].ge('2018')]
 
 '''
 Night of 3/18/20 Stuff
@@ -102,14 +102,15 @@ y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].asty
 
 
 #creating dataframe with details
-order_details = y.groupby(['transaction_id','transaction_date','customer_last_name','customer_state',
+order_details = y.loc[y.transaction_date.ge('2020-03-01')]\
+    .groupby(['transaction_id','transaction_date','customer_last_name','customer_state',
                            'customer_postal_code','product_name','product_quantity','product_weight','product_options'])\
-    .agg({'product_price_x_quantity':'sum','Distributor_Price':'sum','product_total':'sum','product_price':'sum'})\
-    .assign(Margin_Per_Product = lambda x: x['product_price'] - x['Distributor_Price'])\
+    .agg({'product_price_x_quantity':'sum','distributor_price':'sum','product_total':'sum','product_price':'sum'})\
+    .assign(Margin_Per_Product = lambda x: x['product_price'] - x['distributor_price'])\
     .reset_index('product_quantity')\
     .assign(Total_Margin_Order = lambda x: x['product_quantity'] * x['Margin_Per_Product'])
 
-order_details = order_details[['product_quantity','product_price','product_price_x_quantity','Distributor_Price','Margin_Per_Product','Total_Margin_Order']]
+order_details = order_details[['product_quantity','product_price','product_price_x_quantity','distributor_price','Margin_Per_Product','Total_Margin_Order']]
 
 order_summary_margin = order_details[['product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2]).sum()
 order_summary_units = y.groupby(['transaction_id','transaction_date','customer_last_name'])['combined'].apply(', \n'.join)
