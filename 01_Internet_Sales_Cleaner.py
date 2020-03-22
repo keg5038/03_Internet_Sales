@@ -26,6 +26,8 @@ pd.set_option('display.max_columns', 20)
 
 idx = pd.IndexSlice
 
+today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
+
 os.chdir(os.path.join(os.getenv('HOME'),
     'Dropbox/BKM - Marketing/Web Sales'))
 
@@ -141,14 +143,28 @@ summary = summary.rename({'product_price_x_quantity':'Total Revenue (not includi
                           'Actual Freight Expense':'Actual Freight Expense',
                          "Net_Margin" : "Net Margin after Shipping"})
 
-today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
+
+
+
+'''
+Get list of 'bad' freight deals to look at specifics
+
+'''
+bad = order_total_ship_log.loc[
+    order_total_ship_log['Actual Freight Expense'].notnull() &
+    order_total_ship_log['Net_Margin'].le(10)]\
+    .index.get_level_values(0)
+
+
+
 df_list = [summary, order_total_ship_log, order_details, order_total ]
 df_names = ["Summary",'Margin per Order', 'Details','Backup']
 workbook_name = "Web Orders as of .xlsx"
 
-#merge good
 
-psota_fun.dfs_tab(df_list,df_names,workbook_name )
+
+a_fun.dfs_tab(df_list,df_names,workbook_name )
+
 
 print(df)
 
