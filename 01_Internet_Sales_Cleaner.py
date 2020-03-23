@@ -156,7 +156,8 @@ bad = order_total_ship_log.loc[
     order_total_ship_log['Net_Margin'].le(10)]\
     .index.get_level_values(0)
 
-
+#:TODO look at relationship between shipping costs & state / order total
+#:TODO use hue for good/ bad
 
 df_list = [summary, order_total_ship_log, order_details, order_total ]
 df_names = ["Summary",'Margin per Order', 'Details','Backup']
