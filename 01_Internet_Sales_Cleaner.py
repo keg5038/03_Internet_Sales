@@ -99,7 +99,7 @@ Night of 3/18/20 Stuff
 #merging 2020 dataframe with price spreadsheet that has distributor price
 y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
 y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
-
+y['units_total'] = y['product_quantity'] * y['units_normalized']
 
 #creating dataframe with details
 order_details = y.loc[y.transaction_date.ge('2020-03-01')]\
@@ -158,6 +158,8 @@ bad = order_total_ship_log.loc[
 
 #:TODO look at relationship between shipping costs & state / order total
 #:TODO use hue for good/ bad
+#:TODO look at what is deemed bad - what is relationship that makes it bad?
+#:TODO put reporting together on sales of boxes / cases for last couple of years
 
 df_list = [summary, order_total_ship_log, order_details, order_total ]
 df_names = ["Summary",'Margin per Order', 'Details','Backup']
