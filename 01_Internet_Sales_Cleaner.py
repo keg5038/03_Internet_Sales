@@ -156,6 +156,7 @@ bad = order_total_ship_log.loc[
     order_total_ship_log['Net_Margin'].le(10)]\
     .index.get_level_values(0)
 
+#:TODO probably need to figure out product weight combined for entire order; this should be made into a function
 #:TODO look at relationship between shipping costs & state / order total
 #:TODO use hue for good/ bad
 #:TODO look at what is deemed bad - what is relationship that makes it bad?
