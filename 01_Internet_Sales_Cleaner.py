@@ -100,23 +100,25 @@ Night of 3/18/20 Stuff
 y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
 y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
 y['units_total'] = y['product_quantity'] * y['units_normalized']
+#this was wrong - make sure weight_total was right
+y['weight_total'] = y['product_quantity'] * y['product_weight']
 
 #creating dataframe with details
 order_details = y.loc[y.transaction_date.ge('2020-03-01')]\
     .groupby(['transaction_id','transaction_date','customer_last_name','customer_state',
                            'customer_postal_code','product_name','product_quantity','product_weight','product_options'])\
-    .agg({'product_price_x_quantity':'sum','distributor_price':'sum','product_total':'sum','product_price':'sum'})\
+    .agg({'product_price_x_quantity':'sum','distributor_price':'sum','product_total':'sum','product_price':'sum','weight_total':'sum'})\
     .assign(Margin_Per_Product = lambda x: x['product_price'] - x['distributor_price'])\
     .reset_index('product_quantity')\
     .assign(Total_Margin_Order = lambda x: x['product_quantity'] * x['Margin_Per_Product'])
 
-order_details = order_details[['product_quantity','product_price','product_price_x_quantity','distributor_price','Margin_Per_Product','Total_Margin_Order']]
+order_details = order_details[['product_quantity','product_price','weight_total','product_price_x_quantity','distributor_price','Margin_Per_Product','Total_Margin_Order']]
 
-order_summary_margin = order_details[['product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2]).sum()
-order_summary_units = y.groupby(['transaction_id','transaction_date','customer_last_name'])['combined'].apply(', \n'.join)
+order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3]).sum()
+order_summary_units = y.loc[y.transaction_date.ge('2020-03-01')].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])['combined'].apply(', \n'.join)
 
 order_total = pd.concat([order_summary_margin,order_summary_units],axis=1)
-order_total = order_total[['combined','product_price_x_quantity','Total_Margin_Order']]
+order_total = order_total[['combined','weight_total','product_price_x_quantity','Total_Margin_Order']]
 
 order_total_ship_log = pd.merge(order_total.reset_index().set_index('transaction_id'),
                                 ship_log[['Order #','Actual Freight Expense']].drop_duplicates().set_index('Order #'),
@@ -148,17 +150,20 @@ summary = summary.rename({'product_price_x_quantity':'Total Revenue (not includi
 
 
 '''
-Get list of 'bad' freight deals to look at specifics
-
+DataFrame for plotting scatterplots
 '''
-bad = order_total_ship_log.loc[
-    order_total_ship_log['Actual Freight Expense'].notnull() &
-    order_total_ship_log['Net_Margin'].le(10)]\
-    .index.get_level_values(0)
+x = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()].reset_index()
+
+# sns.scatterplot(x='weight_total',y='Actual Freight Expense',hue='Positive/Negative',data=x)
+# sns.scatterplot(x='weight_total',y='Actual Freight Expense',hue='customer_state',data=x)
+#sns.scatterplot(x='weight_total',y='Actual Freight Expense',data=x)
+#:TODO read in zone from FedEx file
+
 
 #:TODO probably need to figure out product weight combined for entire order; this should be made into a function
-#:TODO look at relationship between shipping costs & state / order total
-#:TODO use hue for good/ bad
+'''
+can merge order_total_ship_log with new dataframe that would include 
+'''
 #:TODO look at what is deemed bad - what is relationship that makes it bad?
 #:TODO put reporting together on sales of boxes / cases for last couple of years
 
