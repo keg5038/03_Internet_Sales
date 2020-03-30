@@ -152,11 +152,12 @@ summary = summary.rename({'product_price_x_quantity':'Total Revenue (not includi
 '''
 DataFrame for plotting scatterplots
 '''
-x = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()].reset_index()
+p = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()].reset_index()
 
-# sns.scatterplot(x='weight_total',y='Actual Freight Expense',hue='Positive/Negative',data=x)
-# sns.scatterplot(x='weight_total',y='Actual Freight Expense',hue='customer_state',data=x)
-#sns.scatterplot(x='weight_total',y='Actual Freight Expense',data=x)
+# sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='Positive/Negative',data=p)
+# sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='customer_state',data=p)
+#sns.scatterplot(p='weight_total',y='Actual Freight Expense',data=p)
+#:TODO look at how many pieces vs. shipping costs
 #:TODO read in zone from FedEx file
 
 
