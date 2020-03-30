@@ -154,11 +154,31 @@ DataFrame for plotting scatterplots
 '''
 p = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()].reset_index()
 
-# sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='Positive/Negative',data=p)
-# sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='customer_state',data=p)
-#sns.scatterplot(p='weight_total',y='Actual Freight Expense',data=p)
 #:TODO look at how many pieces vs. shipping costs
 #:TODO read in zone from FedEx file
+'''
+FedEx File Zones:
+'''
+lookup = fed.loc[fed['Date_Invoice'].gt('2020-01-01')
+                 & (fed['Pricing zone'].ne('Non Zone'))][['Pricing zone','Recipient State/Province']].drop_duplicates()
+
+lookup['Pricing zone'] = lookup['Pricing zone'].astype(int)
+lookup = lookup[['Pricing zone','Recipient State/Province']].drop_duplicates()
+
+p = pd.merge(p.set_index('customer_state'),
+             lookup.set_index('Recipient State/Province'),
+             left_index=True, right_index = True)
+
+# sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='Positive/Negative',data=p)
+# sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='customer_state',data=p)
+
+# sns.scatterplot(p='weight_total',y='Actual Freight Expense',data=p)
+# sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='Pricing zone',data=p)
+
+# sns.pairplot(p[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Actual Freight Expense','Positive/Negative']], kind='scatter', diag_kind = 'hist',hue='Positive/Negative')
+
+
+
 
 
 #:TODO probably need to figure out product weight combined for entire order; this should be made into a function
