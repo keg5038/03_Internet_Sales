@@ -172,28 +172,50 @@ lookup = pd.merge(lookup, l, left_on='Pricing zone', right_on='Pricing zone')
 ''''
 FedEx Part 2 - will replace above lookup stuff if figured out
 '''
+#:TODO needs to be cleaned up
 k = fed.loc[fed['Pricing zone'].notnull() &
             fed['Pricing zone'].ne('Non Zone')][['Pricing zone','Recipient State/Province','Shipment Tracking Number']].drop_duplicates()
 k['Pricing zone'] = k['Pricing zone'].astype(int)
-#:TODO figure out groupby to get max for each state
+kk = k.groupby(['Recipient State/Province','Pricing zone']).agg(count = ('Shipment Tracking Number','size'))
+kk = kk.sort_values(by=['Recipient State/Province','count'],ascending=[True,False]).groupby(level=0).head(1)
+kk = kk.reset_index().drop('count',axis=1)
+kl = kk.groupby('Pricing zone')['Recipient State/Province'].apply(list).reset_index()
 
+kl.reset_index()
+kl['Zone-State'] = kl['Pricing zone'].astype(str)+ "-" + kl['Recipient State/Province'].astype(str)
+kkk = pd.merge(kk.set_index('Pricing zone'), kl.set_index('Pricing zone'), left_index=True, right_index=True).reset_index()
+n = pd.merge(p, kkk[['Recipient State/Province_x','Zone-State']], left_on=['customer_state'], right_on=['Recipient State/Province_x']).drop('Recipient State/Province_x', axis=1)
+n['New_v_Old_Pricing'] = np.where(n['transaction_date'].ge('2020-03-25'),'New Pricing','Old Pricing')
+
+#THIS WORKS AS INTENDED; get rid of lookups & all of that
+# sns.scatterplot(x='weight_total',y='Net_Margin', hue='Zone-State', style='New_v_Old_Pricing', data=n).set(title='Weight v Net Margin as of 2020-04-02')
+
+#:TODO figure out groupby to get max for each state
+#:TODO delete all of below, including p1 p2
 #pulling in zones
 # doesn't work - issue is that some states sit in multiple zones; need to figure out which zone most are in & take max only
-p = pd.merge(p,lookup, how='left',
-             left_on='customer_state',
-             right_on='Recipient State/Province').drop('Recipient State/Province',axis=1)
+# p = pd.merge(p,lookup, how='left',
+#              left_on='customer_state',
+#              right_on='Recipient State/Province').drop('Recipient State/Province',axis=1)
 
 #unfortunately this doesn't
 
 # sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='Positive/Negative',data=p)
 # sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='customer_state',data=p)
 
-# sns.scatterplot(p='weight_total',y='Actual Freight Expense',data=p)
+# sns.scatterplot(x='weight_total',y='Actual Freight Expense',data=p)
 # sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='Pricing zone',data=p).set(title='Pricing Based on Zone')
 
 # sns.pairplot(p[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Actual Freight Expense','Positive/Negative']], kind='scatter', diag_kind = 'hist',hue='Positive/Negative')
 
-
+''''
+Looking at pre & post price change
+'''
+# p2 = p[p['transaction_date'].ge('2020-03-25')]
+# p1 = p[p['transaction_date'].lt('2020-03-25')]
+# sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='New_v_Old_Pricing',data=p1).set(title='Pricing Based on Zone - Pre 3/25/2020')
+# sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='New_v_Old_Pricing',data=p2).set(title='Pricing Based on Zone - Pre 3/25/2020')
+# sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='New_v_Old_Pricing',data=p2).set(title='Pricing Based on Zone - Post 3/25/2020')
 
 
 
@@ -210,7 +232,7 @@ workbook_name = "Web Orders as of .xlsx"
 
 
 
-a_fun.dfs_tab(df_list,df_names,workbook_name )
+# a_fun.dfs_tab(df_list,df_names,workbook_name )
 
 
 print(df)
