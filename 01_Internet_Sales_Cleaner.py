@@ -178,7 +178,6 @@ n['New_v_Old_Pricing'] = np.where(n['transaction_date'].ge('2020-03-25'),'New Pr
 #:TODO figure out groupby to get max for each state
 #:TODO delete all of below, including p1 p2
 
-#unfortunately this doesn't
 
 # sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='Positive/Negative',data=p)
 # sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='customer_state',data=p)
