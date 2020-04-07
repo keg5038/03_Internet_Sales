@@ -195,7 +195,17 @@ df_list = [summary, order_total_ship_log, order_details, order_total ]
 df_names = ["Summary",'Margin per Order', 'Details','Backup']
 workbook_name = "Web Orders as of .xlsx"
 
+'''
+Looking @ repeat customers
+z = df.loc[df['transaction_date'].dt.year.ge(2017)][['transaction_id','customer_last_name','transaction_date','shipping_postal_code','Pre_Post']].drop_duplicates()
+a = z.groupby(['customer_last_name','shipping_postal_code','Pre_Post']).agg(count = ('transaction_id','nunique')).sort_values('count').unstack().fillna(0).droplevel(level=0,axis=1).reset_index()
 
+m1 = a['Post'].ne(0)
+m2 = a['Pre'].ne(0)
+
+a.loc[m1 & m2]
+
+'''
 
 # a_fun.dfs_tab(df_list,df_names,workbook_name )
 
