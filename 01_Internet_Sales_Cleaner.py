@@ -54,6 +54,8 @@ df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
 #needed to fill in blanks
 df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
 
+df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-24'),"Post","Pre")
+
 
 '''
 Cleaning FedEx File
@@ -197,7 +199,7 @@ workbook_name = "Web Orders as of .xlsx"
 
 '''
 Looking @ repeat customers
-z = df.loc[df['transaction_date'].dt.year.ge(2017)][['transaction_id','customer_last_name','transaction_date','shipping_postal_code','Pre_Post']].drop_duplicates()
+z = df.loc[df['transaction_date'].dt.year.ge(2012)][['transaction_id','customer_last_name','transaction_date','shipping_postal_code','Pre_Post']].drop_duplicates()
 a = z.groupby(['customer_last_name','shipping_postal_code','Pre_Post']).agg(count = ('transaction_id','nunique')).sort_values('count').unstack().fillna(0).droplevel(level=0,axis=1).reset_index()
 
 m1 = a['Post'].ne(0)
@@ -205,9 +207,60 @@ m2 = a['Pre'].ne(0)
 
 a.loc[m1 & m2]
 
-'''
 
-a_fun.dfs_tab(df_list,df_names,workbook_name )
+pp = z.groupby(['customer_email','Pre_Post']).agg(Count = ('transaction_id','nunique'), Last_Date = ('transaction_date','max'), First_Date = ('transaction_date','min')).unstack().fillna(0)
+
+m3 = pp['Count','Post'].ne(0)
+m4 = pp['Count','Pre'].ne(0)
+
+do you do something similar but for last name plus zip?
+zz = z.groupby([z['customer_last_name'].str.lower(),'shipping_postal_code','Pre_Post']).agg(Count = ('transaction_id','nunique'), Last_Date = ('transaction_date','max'), First_Date = ('transaction_date','min')).unstack().fillna(0)
+
+#look at simple function to not type in each time
+# check emails the same
+#starting with small sample
+'''
+dupes = df.loc[df['transaction_date'].dt.year.ge(2012)]\
+    [['transaction_id','customer_last_name','transaction_date','shipping_postal_code','customer_email',
+      'customer_postal_code','Pre_Post']].drop_duplicates()
+
+def unique_sales(df_use):
+    '''
+    :param df_use: dataframe to pass - dupes
+    :type df_use: 
+    :return: will return 3 dataframes
+    :rtype: 
+    '''
+
+    email = df_use.groupby(['customer_email','Pre_Post']).agg(Count = ('transaction_id','nunique'),
+             Last_Date = ('transaction_date','max'),
+             First_Date = ('transaction_date','min')).unstack().fillna(0)
+
+    e1 = email['Count','Pre'].ne(0)
+    e2 = email['Count','Post'].ne(0)
+    email_common = email.loc[e1 & e2].sort_index(ascending=[True, False], axis=1)
+
+    cust_post = df_use.groupby([df_use['customer_last_name'].str.lower(),'customer_postal_code', 'Pre_Post'])\
+        .agg(Count=('transaction_id', 'nunique'),
+            Last_Date=('transaction_date', 'max'),
+            First_Date=('transaction_date', 'min')).unstack().fillna(0)
+
+    c1 = cust_post['Count', 'Pre'].ne(0)
+    c2 = cust_post['Count', 'Post'].ne(0)
+    cust_post_common = cust_post.loc[c1 & c2].sort_index(ascending=[True, False], axis=1)
+
+    ship_post = df_use.groupby([df_use['customer_last_name'].str.lower(), 'shipping_postal_code', 'Pre_Post']) \
+        .agg(Count=('transaction_id', 'nunique'),
+             Last_Date=('transaction_date', 'max'),
+             First_Date=('transaction_date', 'min')).unstack().fillna(0)
+
+    s1 = ship_post['Count', 'Pre'].ne(0)
+    s2 = ship_post['Count', 'Post'].ne(0)
+    ship_post_common = ship_post.loc[s1 & s2].sort_index(ascending=[True, False], axis=1)
+
+    return email_common, cust_post_common, ship_post_common
+
+# a_fun.dfs_tab(df_list,df_names,workbook_name )
 
 
 print(df)
