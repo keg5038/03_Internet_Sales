@@ -213,7 +213,8 @@ def unique_sales(df_use):
 
     e1 = email['Count','Pre'].ne(0)
     e2 = email['Count','Post'].ne(0)
-    email_common = email.loc[e1 & e2].sort_index(ascending=[True, False], axis=1)
+    email_common = email.loc[e1 & e2].reorder_levels([1,0],axis=1)\
+        .sort_index(level=[0,1],ascending=[False,True], axis=1)
 
     # looking at customer last name & customer postal code
     cust_post = df_use.groupby([df_use['customer_last_name'].str.lower(),'customer_postal_code', 'Pre_Post'])\
@@ -223,7 +224,8 @@ def unique_sales(df_use):
 
     c1 = cust_post['Count', 'Pre'].ne(0)
     c2 = cust_post['Count', 'Post'].ne(0)
-    cust_post_common = cust_post.loc[c1 & c2].sort_index(ascending=[True, False], axis=1)
+    cust_post_common = cust_post.loc[c1 & c2].reorder_levels([1,0],axis=1)\
+        .sort_index(level=[0,1],ascending=[False,True], axis=1)
 
     #looking at customer last name & shipping postal code
     ship_post = df_use.groupby([df_use['customer_last_name'].str.lower(), 'shipping_postal_code', 'Pre_Post']) \
@@ -233,7 +235,8 @@ def unique_sales(df_use):
 
     s1 = ship_post['Count', 'Pre'].ne(0)
     s2 = ship_post['Count', 'Post'].ne(0)
-    ship_post_common = ship_post.loc[s1 & s2].sort_index(ascending=[True, False], axis=1)
+    ship_post_common = ship_post.loc[s1 & s2].reorder_levels([1,0],axis=1)\
+        .sort_index(level=[0,1],ascending=[False,True], axis=1)
 
     #looking at shipping last name & shipping postal code
     ship_name = df_use.groupby([df_use['shipping_last_name'].str.lower(), 'shipping_postal_code', 'Pre_Post']) \
@@ -243,7 +246,8 @@ def unique_sales(df_use):
 
     n1 = ship_name['Count', 'Pre'].ne(0)
     n2 = ship_name['Count', 'Post'].ne(0)
-    ship_name_common = ship_name.loc[n1 & n2].sort_index(ascending=[True, False], axis=1)
+    ship_name_common = ship_name.loc[n1 & n2].reorder_levels([1,0],axis=1)\
+        .sort_index(level=[0,1],ascending=[False,True], axis=1)
 
 
     return email_common, cust_post_common, ship_post_common, ship_name_common
