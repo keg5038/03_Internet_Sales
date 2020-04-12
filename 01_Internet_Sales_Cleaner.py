@@ -54,11 +54,13 @@ df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
 #needed to fill in blanks
 df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
 
-df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-24'),"Post","Pre")
+#pre_post = email blast, not when shipping changes were implemented
+df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
 
 
 '''
 Cleaning FedEx File
+
 '''
 fed = pd.concat([pd.read_csv(f) for f in glob ('./FedEx_Files/*.csv')])
 
@@ -174,54 +176,26 @@ kkk = pd.merge(kk.set_index('Pricing zone'), kl.set_index('Pricing zone'), left_
 n = pd.merge(p, kkk[['Recipient State/Province_x','Zone-State']], left_on=['customer_state'], right_on=['Recipient State/Province_x']).drop('Recipient State/Province_x', axis=1)
 n['New_v_Old_Pricing'] = np.where(n['transaction_date'].ge('2020-03-25'),'New Pricing','Old Pricing')
 
-#THIS WORKS AS INTENDED; get rid of lookups & all of that
-# sns.scatterplot(x='weight_total',y='Net_Margin', hue='Zone-State', style='New_v_Old_Pricing', data=n).set(title='Weight v Net Margin as of 2020-04-02')
+#THIS WORKS AS INTENDED
+# sns.scatterplot(x='weight_total',y='Net_Margin', hue='Zone-State', style='New_v_Old_Pricing', data=n).set(title='Weight v Net Margin as of 2020-04-10')
+
+# sns.pairplot(n[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Net_Margin','Actual Freight Expense','Positive/Negative','New_v_Old_Pricing']], kind='scatter', diag_kind = 'hist',hue='New_v_Old_Pricing').savefig('teest2.png')
+
+# sns.pairplot(n[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Net_Margin','Actual Freight Expense','Positive/Negative']], kind='scatter', diag_kind = 'hist',hue='Positive/Negative').savefig('teest.png')
 
 #:TODO figure out groupby to get max for each state
 #:TODO delete all of below, including p1 p2
 
-
-# sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='Positive/Negative',data=p)
-# sns.scatterplot(p='weight_total',y='Actual Freight Expense',hue='customer_state',data=p)
-
-# sns.scatterplot(x='weight_total',y='Actual Freight Expense',data=p)
-# sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='Pricing zone',data=p).set(title='Pricing Based on Zone')
-
-# sns.pairplot(p[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Actual Freight Expense','Positive/Negative']], kind='scatter', diag_kind = 'hist',hue='Positive/Negative')
-
-# sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='New_v_Old_Pricing',data=p1).set(title='Pricing Based on Zone - Pre 3/25/2020')
-# sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='New_v_Old_Pricing',data=p2).set(title='Pricing Based on Zone - Pre 3/25/2020')
-# sns.scatterplot(x='weight_total',y='product_price_x_quantity',hue='Positive/Negative', style='New_v_Old_Pricing',data=p2).set(title='Pricing Based on Zone - Post 3/25/2020')
 
 df_list = [summary, order_total_ship_log, order_details, order_total ]
 df_names = ["Summary",'Margin per Order', 'Details','Backup']
 workbook_name = "Web Orders as of .xlsx"
 
 '''
-Looking @ repeat customers
-z = df.loc[df['transaction_date'].dt.year.ge(2012)][['transaction_id','customer_last_name','transaction_date','shipping_postal_code','Pre_Post']].drop_duplicates()
-a = z.groupby(['customer_last_name','shipping_postal_code','Pre_Post']).agg(count = ('transaction_id','nunique')).sort_values('count').unstack().fillna(0).droplevel(level=0,axis=1).reset_index()
-
-m1 = a['Post'].ne(0)
-m2 = a['Pre'].ne(0)
-
-a.loc[m1 & m2]
-
-
-pp = z.groupby(['customer_email','Pre_Post']).agg(Count = ('transaction_id','nunique'), Last_Date = ('transaction_date','max'), First_Date = ('transaction_date','min')).unstack().fillna(0)
-
-m3 = pp['Count','Post'].ne(0)
-m4 = pp['Count','Pre'].ne(0)
-
-do you do something similar but for last name plus zip?
-zz = z.groupby([z['customer_last_name'].str.lower(),'shipping_postal_code','Pre_Post']).agg(Count = ('transaction_id','nunique'), Last_Date = ('transaction_date','max'), First_Date = ('transaction_date','min')).unstack().fillna(0)
-
-#look at simple function to not type in each time
-# check emails the same
-#starting with small sample
+Looking at repeat customers for shipping
 '''
 dupes = df.loc[df['transaction_date'].dt.year.ge(2012)]\
-    [['transaction_id','customer_last_name','transaction_date','shipping_postal_code','customer_email',
+    [['transaction_id','shipping_last_name','customer_last_name','transaction_date','shipping_postal_code','customer_email',
       'customer_postal_code','Pre_Post']].drop_duplicates()
 
 def unique_sales(df_use):
@@ -232,6 +206,7 @@ def unique_sales(df_use):
     :rtype: 
     '''
 
+    #looking at email addresses
     email = df_use.groupby(['customer_email','Pre_Post']).agg(Count = ('transaction_id','nunique'),
              Last_Date = ('transaction_date','max'),
              First_Date = ('transaction_date','min')).unstack().fillna(0)
@@ -240,6 +215,7 @@ def unique_sales(df_use):
     e2 = email['Count','Post'].ne(0)
     email_common = email.loc[e1 & e2].sort_index(ascending=[True, False], axis=1)
 
+    # looking at customer last name & customer postal code
     cust_post = df_use.groupby([df_use['customer_last_name'].str.lower(),'customer_postal_code', 'Pre_Post'])\
         .agg(Count=('transaction_id', 'nunique'),
             Last_Date=('transaction_date', 'max'),
@@ -249,6 +225,7 @@ def unique_sales(df_use):
     c2 = cust_post['Count', 'Post'].ne(0)
     cust_post_common = cust_post.loc[c1 & c2].sort_index(ascending=[True, False], axis=1)
 
+    #looking at customer last name & shipping postal code
     ship_post = df_use.groupby([df_use['customer_last_name'].str.lower(), 'shipping_postal_code', 'Pre_Post']) \
         .agg(Count=('transaction_id', 'nunique'),
              Last_Date=('transaction_date', 'max'),
@@ -258,9 +235,30 @@ def unique_sales(df_use):
     s2 = ship_post['Count', 'Post'].ne(0)
     ship_post_common = ship_post.loc[s1 & s2].sort_index(ascending=[True, False], axis=1)
 
-    return email_common, cust_post_common, ship_post_common
+    #looking at shipping last name & shipping postal code
+    ship_name = df_use.groupby([df_use['shipping_last_name'].str.lower(), 'shipping_postal_code', 'Pre_Post']) \
+        .agg(Count=('transaction_id', 'nunique'),
+             Last_Date=('transaction_date', 'max'),
+             First_Date=('transaction_date', 'min')).unstack().fillna(0)
 
-# a_fun.dfs_tab(df_list,df_names,workbook_name )
+    n1 = ship_name['Count', 'Pre'].ne(0)
+    n2 = ship_name['Count', 'Post'].ne(0)
+    ship_name_common = ship_name.loc[n1 & n2].sort_index(ascending=[True, False], axis=1)
+
+
+    return email_common, cust_post_common, ship_post_common, ship_name_common
+
+## Looking at unique email vs. unique transactions
+# before = a.index.get_level_values(0)
+# df['Repeat_v_New'] = np.where(df['customer_email'].isin(before),'Repeat_Customer','New_Customer')
+# df.groupby(['Pre_Post','Repeat_v_New']).agg(uni_email = ('customer_email','nunique'), uniq_tran = ('transaction_id','nunique'))
+
+
+
+
+#print(len(a),len(b),len(c),len(d))
+
+a_fun.dfs_tab(df_list,df_names,workbook_name )
 
 
 print(df)
