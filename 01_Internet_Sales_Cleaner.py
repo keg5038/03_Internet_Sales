@@ -257,7 +257,16 @@ def unique_sales(df_use):
 # df['Repeat_v_New'] = np.where(df['customer_email'].isin(before),'Repeat_Customer','New_Customer')
 # df.groupby(['Pre_Post','Repeat_v_New']).agg(uni_email = ('customer_email','nunique'), uniq_tran = ('transaction_id','nunique'))
 
+#looking at sales of units
+'''
+s = y.loc[y['transaction_date'].ge('2020-03-16')]\
+    .groupby(['product_normalized','case_v_unit',pd.Grouper(key='transaction_date',freq='W')])\
+    .agg({'product_quantity':'sum','units_total':'sum','transaction_id':'nunique'})\
+    .unstack().fillna(0).sort_index(1).sort_index(level=[0,1],ascending=[True,False])
+    
+poc = y.loc[(y['transaction_date'].le('2020-03-22') & y['transaction_date'].ge('2020-03-15')) & (y.product_normalized.str.contains('pocono cre',case=False))]
 
+'''
 
 
 #print(len(a),len(b),len(c),len(d))
