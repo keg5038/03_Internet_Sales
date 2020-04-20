@@ -94,7 +94,7 @@ ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
 '''
 This is to pull info for Andrew
 '''
-# x is just filtered dataframe
+# x is just filtered dataframed
 x = df.loc[df['transaction_date'].ge('2018')]
 
 '''
