@@ -289,6 +289,17 @@ def fedex_out(df, start):
     :return: CSV file
     '''
 
+    #take df, filter by date entered, & keep only needed info
+    x = df.loc[df['transaction_date'].ge(start)][['transaction_id','transaction_date','product_total','tax_total','shipping_total','order_total','shipping_first_name','shipping_last_name','shipping_address1','shipping_address2','shipping_city','shipping_state','shipping_postal_code','shipping_country','shipping_phone','customer_email']].drop_duplicates()
+
+    # create dictionary to rename fields from
+    rename = {'transaction_id','transaction_date','product_total','tax_total','shipping_total','order_total','shipping_first_name','shipping_last_name','shipping_address1','shipping_address2','shipping_city','shipping_state','shipping_postal_code','shipping_country','shipping_phone'}
+
+    #create csv file with correct property for label file
+
+    #fill forward some required fields
+
+    return x
 
 #print(len(a),len(b),len(c),len(d))
 
