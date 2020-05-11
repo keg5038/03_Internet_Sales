@@ -90,6 +90,12 @@ Shipping Document - where we pull in from the office sheet
 ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
                                      'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
 
+'''
+Fedex sheet for labels
+'''
+label = pd.read_csv(os.path.join(os.getenv('HOME'),
+                                     'Dropbox/BKM - Marketing/Web Sales/FedEx_Files/fedex_upload_master.csv'))
+
 
 '''
 This is to pull info for Andrew
@@ -257,6 +263,7 @@ def unique_sales(df_use):
 # df['Repeat_v_New'] = np.where(df['customer_email'].isin(before),'Repeat_Customer','New_Customer')
 # df.groupby(['Pre_Post','Repeat_v_New']).agg(uni_email = ('customer_email','nunique'), uniq_tran = ('transaction_id','nunique'))
 
+
 #looking at sales of units
 '''
 s = y.loc[y['transaction_date'].ge('2020-03-16')]\
@@ -267,6 +274,20 @@ s = y.loc[y['transaction_date'].ge('2020-03-16')]\
 poc = y.loc[(y['transaction_date'].le('2020-03-22') & y['transaction_date'].ge('2020-03-15')) & (y.product_normalized.str.contains('pocono cre',case=False))]
 
 '''
+
+'''
+Create FedEx File to upload for Wendy
+'''
+def fedex_out(df, start):
+    '''
+    :TODO create file for Wendy
+    Take required elements from the label df, create map of df to label
+    Fill from df to label df, keeping consistent
+
+    :param df: dataframe to input
+    :param start: start date / time to use for filter
+    :return: CSV file
+    '''
 
 
 #print(len(a),len(b),len(c),len(d))
