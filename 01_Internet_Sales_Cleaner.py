@@ -301,6 +301,15 @@ def fedex_out(df, start):
 
     return x
 
+'''
+New 5/24/20 - Printout to copy & paste to FedEx File
+#:TODO - create function to automate
+
+f = y[['transaction_id','transaction_date','shipping_first_name','shipping_last_name','shipping_address1','shipping_address2','shipping_city','shipping_state','shipping_postal_code','shipping_country','customer_phone','product_normalized','units_total','weight_total']]
+f.loc[f['transaction_date'].ge('2020-05-22')]
+'''
+
+
 #print(len(a),len(b),len(c),len(d))
 
 a_fun.dfs_tab(df_list,df_names,workbook_name )
