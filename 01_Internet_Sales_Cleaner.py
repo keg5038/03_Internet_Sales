@@ -278,39 +278,37 @@ poc = y.loc[(y['transaction_date'].le('2020-03-22') & y['transaction_date'].ge('
 '''
 Create FedEx File to upload for Wendy
 '''
-def fedex_out(df, start):
-    '''
-    :TODO create file for Wendy
-    Take required elements from the label df, create map of df to label
-    Fill from df to label df, keeping consistent
-
-    :param df: dataframe to input
-    :param start: start date / time to use for filter
-    :return: CSV file
-    '''
-
-    #take df, filter by date entered, & keep only needed info
-    x = df.loc[df['transaction_date'].ge(start)][['transaction_id','transaction_date','product_total','tax_total','shipping_total','order_total','shipping_first_name','shipping_last_name','shipping_address1','shipping_address2','shipping_city','shipping_state','shipping_postal_code','shipping_country','shipping_phone','customer_email']].drop_duplicates()
-
-    # create dictionary to rename fields from
-    rename = {'transaction_id','transaction_date','product_total','tax_total','shipping_total','order_total','shipping_first_name','shipping_last_name','shipping_address1','shipping_address2','shipping_city','shipping_state','shipping_postal_code','shipping_country','shipping_phone'}
-
-    #create csv file with correct property for label file
-
-    #fill forward some required fields
-
-    return x
 
 '''
-New 5/24/20 - Printout to copy & paste to FedEx File
+New 5/28/20 - Printout to copy & paste to FedEx File
 #:TODO - create function to automate
-
-f = y[['transaction_id','transaction_date','shipping_first_name','shipping_last_name','shipping_address1','shipping_address2','shipping_city','shipping_state','shipping_postal_code','shipping_country','customer_phone','product_normalized','units_total','weight_total']]
-f.loc[f['transaction_date'].ge('2020-05-22')]
 '''
+def fedex_log_printout(start):
+    '''
+
+    :param start: date to use to filter everything after
+    :type start:
+    :return: file to excel to copy & paste
+    :rtype:
+    '''
+    #create DF of what you need
+    f = y[['transaction_id','transaction_date','shipping_first_name','shipping_last_name',
+           'shipping_address1','shipping_address2','shipping_city','shipping_state','shipping_postal_code',
+           'shipping_country','customer_phone','product_normalized','units_total','weight_total','item_code']]
+
+    #look up transactions that are in FedEx log already; if in, not necessary to add in
+    p = ship_log['Order #'].unique()
+
+
+    #:TODO fix column names so they line up exactly for easy copy & paste
+
+    return f.loc[f['transaction_date'].ge(start) & ~f['transaction_id'].isin(p)]
+
+
 
 
 #print(len(a),len(b),len(c),len(d))
+
 
 a_fun.dfs_tab(df_list,df_names,workbook_name )
 
