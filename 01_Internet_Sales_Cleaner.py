@@ -299,10 +299,13 @@ def fedex_log_printout(start):
     #look up transactions that are in FedEx log already; if in, not necessary to add in
     p = ship_log['Order #'].unique()
 
+    f = f.loc[f['transaction_date'].ge(start) & ~f['transaction_id'].isin(p)]
+    f['customer'] = f['shipping_first_name'] + " " + f['shipping_last_name']
 
-    #:TODO fix column names so they line up exactly for easy copy & paste
+    f[['transaction_id', 'customer', 'customer_phone', 'item_code', 'product_normalized', 'units_total']].to_excel(
+        'To Add Fedex Log.xlsx')
 
-    return f.loc[f['transaction_date'].ge(start) & ~f['transaction_id'].isin(p)]
+    return f[['transaction_id','customer','customer_phone','item_code','product_normalized','units_total']]
 
 
 
