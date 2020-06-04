@@ -101,6 +101,7 @@ label = pd.read_csv(os.path.join(os.getenv('HOME'),
 This is to pull info for Andrew
 '''
 # x is just filtered dataframed
+#changed 6/4
 x = df.loc[df['transaction_date'].ge('2018')]
 
 '''
@@ -114,7 +115,9 @@ y['units_total'] = y['product_quantity'] * y['units_normalized']
 y['weight_total'] = y['product_quantity'] * y['product_weight']
 
 #creating dataframe with details
-order_details = y.loc[y.transaction_date.ge('2020-03-01')]\
+date_to_use = '2020-03-23'
+
+order_details = y.loc[y.transaction_date.ge(date_to_use)]\
     .groupby(['transaction_id','transaction_date','customer_last_name','customer_state',
                            'customer_postal_code','product_name','product_quantity','product_weight','product_options'])\
     .agg({'product_price_x_quantity':'sum','distributor_price':'sum','product_total':'sum','product_price':'sum','weight_total':'sum'})\
@@ -125,7 +128,7 @@ order_details = y.loc[y.transaction_date.ge('2020-03-01')]\
 order_details = order_details[['product_quantity','product_price','weight_total','product_price_x_quantity','distributor_price','Margin_Per_Product','Total_Margin_Order']]
 
 order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3]).sum()
-order_summary_units = y.loc[y.transaction_date.ge('2020-03-01')].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])['combined'].apply(', \n'.join)
+order_summary_units = y.loc[y.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])['combined'].apply(', \n'.join)
 
 order_total = pd.concat([order_summary_margin,order_summary_units],axis=1)
 order_total = order_total[['combined','weight_total','product_price_x_quantity','Total_Margin_Order']]
@@ -312,6 +315,18 @@ def fedex_log_printout(start):
 
 #print(len(a),len(b),len(c),len(d))
 
+'''
+looking at new pricing on free shipping
+2020/06/04
+
+# :TODO do same math, but on what $5 shipping would look like on orders over a certain threshold;  
+m = n.loc[n['weight_total'].lt(45)]
+m['ship_thresh'] =np.where(m['product_price_x_quantity'].ge(59),'Free','Not_Free')
+m['updated_margin'] = np.where(m['ship_thresh'].eq('Free'),m['Net_Margin']-10,m['Net_Margin'])
+sns.pairplot(m[['product_price_x_quantity','updated_net_margin','Actual Freight Expense','ship_thresh']], kind='scatter', diag_kind = 'hist',hue='ship_thresh')
+
+
+'''
 
 a_fun.dfs_tab(df_list,df_names,workbook_name )
 
