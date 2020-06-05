@@ -323,7 +323,7 @@ looking at new pricing on free shipping
 m = n.loc[n['weight_total'].lt(45)]
 m['ship_thresh'] =np.where(m['product_price_x_quantity'].ge(59),'Free','Not_Free')
 m['updated_margin'] = np.where(m['ship_thresh'].eq('Free'),m['Net_Margin']-10,m['Net_Margin'])
-sns.pairplot(m[['product_price_x_quantity','updated_net_margin','Actual Freight Expense','ship_thresh']], kind='scatter', diag_kind = 'hist',hue='ship_thresh')
+sns.pairplot(m[['product_price_x_quantity','updated_margin','Actual Freight Expense','ship_thresh']], kind='scatter', diag_kind = 'hist',hue='ship_thresh')
 
 m2 = m.loc[m['ship_thresh'].eq('Free')]
 m1= m.loc[m['ship_thresh'].eq('Not_Free')]
@@ -333,10 +333,36 @@ g.y = m2['updated_margin']
 g.plot_joint(plt.scatter,marker='x', c='b',s=50)
 g.plot_marginals(plt.hist, c='b')
 
+#this works as intended
+g = sns.JointGrid(x='product_price_x_quantity',y='updated_margin',data=m)
+sns.scatterplot(x =m2['product_price_x_quantity'], y= m2['updated_margin'], color='r', ax=g.ax_joint)
+sns.scatterplot(x =m1['product_price_x_quantity'], y= m1['updated_margin'], color='b', ax=g.ax_joint)
+sns.distplot(m2['product_price_x_quantity'],kde=False, color='r', ax=g.ax_marg_x)
+sns.distplot(m1['product_price_x_quantity'],kde=False, color='b', ax=g.ax_marg_x)
+sns.distplot(m2['updated_margin'],kde=False, color='r', ax=g.ax_marg_y, vertical=True)
+'''
+'''
+put above in function
+def joint_plot_free_shipping(df, df1, df2, thresh):
+    '''
+
+    :param df: master df to pass; usually 'n'
+    :type df:
+    :param df1:
+    :type df1:
+    :param df2:
+    :type df2:
+    :param thresh:
+    :type thresh:
+    :return:
+    :rtype:
+    '''
+    #
+    df.loc
+
 '''
 
 a_fun.dfs_tab(df_list,df_names,workbook_name )
 
 
 print(df)
-
