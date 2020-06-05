@@ -325,6 +325,13 @@ m['ship_thresh'] =np.where(m['product_price_x_quantity'].ge(59),'Free','Not_Free
 m['updated_margin'] = np.where(m['ship_thresh'].eq('Free'),m['Net_Margin']-10,m['Net_Margin'])
 sns.pairplot(m[['product_price_x_quantity','updated_net_margin','Actual Freight Expense','ship_thresh']], kind='scatter', diag_kind = 'hist',hue='ship_thresh')
 
+m2 = m.loc[m['ship_thresh'].eq('Free')]
+m1= m.loc[m['ship_thresh'].eq('Not_Free')]
+g = sns.jointplot(x=m1['product_price_x_quantity'],y=m1['updated_margin'], color='r')
+g.x = m2['product_price_x_quantity']
+g.y = m2['updated_margin']
+g.plot_joint(plt.scatter,marker='x', c='b',s=50)
+g.plot_marginals(plt.hist, c='b')
 
 '''
 
