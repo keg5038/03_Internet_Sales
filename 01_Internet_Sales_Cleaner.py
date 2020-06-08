@@ -341,26 +341,27 @@ sns.distplot(m2['product_price_x_quantity'],kde=False, color='r', ax=g.ax_marg_x
 sns.distplot(m1['product_price_x_quantity'],kde=False, color='b', ax=g.ax_marg_x)
 sns.distplot(m2['updated_margin'],kde=False, color='r', ax=g.ax_marg_y, vertical=True)
 '''
-'''
-put above in function
-def joint_plot_free_shipping(df, df1, df2, thresh):
-    '''
 
-    :param df: master df to pass; usually 'n'
-    :type df:
-    :param df1:
-    :type df1:
-    :param df2:
-    :type df2:
-    :param thresh:
-    :type thresh:
-    :return:
-    :rtype:
-    '''
-    #
-    df.loc
-
-'''
+# '''
+# put above in function
+# def joint_plot_free_shipping(df, df1, df2, thresh):
+#     '''
+#
+#     :param df: master df to pass; usually 'n'
+#     :type df:
+#     :param df1:
+#     :type df1:
+#     :param df2:
+#     :type df2:
+#     :param thresh:
+#     :type thresh:
+#     :return:
+#     :rtype:
+#     '''
+#     #
+#     df.loc
+#
+# '''
 
 a_fun.dfs_tab(df_list,df_names,workbook_name )
 
