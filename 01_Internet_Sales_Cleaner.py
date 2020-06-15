@@ -278,14 +278,7 @@ poc = y.loc[(y['transaction_date'].le('2020-03-22') & y['transaction_date'].ge('
 
 '''
 
-'''
-Create FedEx File to upload for Wendy
-'''
 
-'''
-New 5/28/20 - Printout to copy & paste to FedEx File
-#:TODO - create function to automate
-'''
 def fedex_log_printout(start):
     '''
 
@@ -340,6 +333,7 @@ sns.scatterplot(x =m1['product_price_x_quantity'], y= m1['updated_margin'], colo
 sns.distplot(m2['product_price_x_quantity'],kde=False, color='r', ax=g.ax_marg_x)
 sns.distplot(m1['product_price_x_quantity'],kde=False, color='b', ax=g.ax_marg_x)
 sns.distplot(m2['updated_margin'],kde=False, color='r', ax=g.ax_marg_y, vertical=True)
+sns.distplot(m1['updated_margin'],kde=False, color='b', ax=g.ax_marg_y, vertical=True)
 '''
 
 # '''
@@ -362,6 +356,18 @@ sns.distplot(m2['updated_margin'],kde=False, color='r', ax=g.ax_marg_y, vertical
 #     df.loc
 #
 # '''
+
+'''
+new 2020-06-15
+looking at weekend sales
+k = y.loc[y.transaction_date.dt.year.ge(2020)].groupby([y['transaction_date'].dt.dayofweek,y['transaction_date'].dt.day_name(),y['transaction_date'].dt.weekofyear]).agg(UniqueTransactions=('transaction_id','nunique'), DollarSales = ('product_price_x_quantity','sum')).assign(AvgTicket = lambda x: x['DollarSales'] / x['UniqueTransactions'])
+
+y.loc[y.transaction_date.dt.year.ge(2020)].groupby([y['transaction_date'].dt.dayofweek,y['transaction_date'].dt.day_name(),y['transaction_date'].dt.weekofyear]).agg(UniqueTransactions=('transaction_id','nunique'), DollarSales = ('product_price_x_quantity','sum')).assign(AvgTicket = lambda x: x['DollarSales'] / x['UniqueTransactions']).loc[idx[:,:,12:],idx[:]].unstack([-1])
+
+a = y.loc[y.product_price_x_quantity.ge(59) & y.transaction_date.ge('2020-03-01')].groupby([pd.Grouper(key='transaction_date',freq='W-MON')]).agg(NumTransactions_over_59 = ('transaction_id','nunique'))
+b = y.loc[y.product_price_x_quantity.lt(59) & y.transaction_date.ge('2020-03-01')].groupby([pd.Grouper(key='transaction_date',freq='W-MON')]).agg(NumTransactions_under_59 = ('transaction_id','nunique'))
+pd.concat([a,b],join='outer', axis=1).assign(Percent_of_Total_Transactions = lambda x: x['NumTransactions_over_59'] / (x['NumTransactions_over_59'] + x['NumTransactions_under_59'] ))
+'''
 
 a_fun.dfs_tab(df_list,df_names,workbook_name )
 
