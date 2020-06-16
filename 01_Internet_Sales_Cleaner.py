@@ -93,8 +93,8 @@ ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
 '''
 Fedex sheet for labels
 '''
-label = pd.read_csv(os.path.join(os.getenv('HOME'),
-                                     'Dropbox/BKM - Marketing/Web Sales/FedEx_Files/fedex_upload_master.csv'))
+'''label = pd.read_csv(os.path.join(os.getenv('HOME'),
+                                     'Dropbox/BKM - Marketing/Web Sales/FedEx_Files/fedex_upload_master.csv'))'''
 
 
 '''
