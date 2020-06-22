@@ -49,6 +49,7 @@ df.loc[:,:'category_code'] = df.loc[:,:'category_code'].fillna(df.groupby('trans
 df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
 
 #added in because
+#product_price_x_quantity - multiples product_price x product_quantity from original dataframe
 df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
 
 #needed to fill in blanks
@@ -105,9 +106,9 @@ This is to pull info for Andrew
 x = df.loc[df['transaction_date'].ge('2018')]
 
 '''
-Night of 3/18/20 Stuff
+y - 
+Dataframe shows all transactions since 2018, merged with pricing spreadsheet (price)
 '''
-#merging 2020 dataframe with price spreadsheet that has distributor price
 y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
 y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
 y['units_total'] = y['product_quantity'] * y['units_normalized']
@@ -116,9 +117,16 @@ y['weight_total'] = y['product_quantity'] * y['product_weight']
 
 #creating dataframe with details
 date_to_use = '2020-03-23'
+'''
+order_details:
+1. filters data based on 'date_to_use'
+2. aggregates each transaction at a product level
+3. computes margin_per_product = price_price - distributor_price
+4. computes Total_Margin_Order = margin_per_order x product_quantity
 
+'''
 order_details = y.loc[y.transaction_date.ge(date_to_use)]\
-    .groupby(['transaction_id','transaction_date','customer_last_name','customer_state',
+    .groupby(['transaction_id','transaction_date','customer_last_name','customer_state','new_v_old',
                            'customer_postal_code','product_name','product_quantity','product_weight','product_options'])\
     .agg({'product_price_x_quantity':'sum','distributor_price':'sum','product_total':'sum','product_price':'sum','weight_total':'sum'})\
     .assign(Margin_Per_Product = lambda x: x['product_price'] - x['distributor_price'])\
@@ -127,28 +135,84 @@ order_details = y.loc[y.transaction_date.ge(date_to_use)]\
 
 order_details = order_details[['product_quantity','product_price','weight_total','product_price_x_quantity','distributor_price','Margin_Per_Product','Total_Margin_Order']]
 
-order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3]).sum()
-order_summary_units = y.loc[y.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])['combined'].apply(', \n'.join)
+'''
+order_summary_margin:
+1. takes order_details & aggregates by first four levels to get summary for entire order
+'''
+order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3,4]).sum()
 
+'''
+order_summary_units:
+1. dataframe to put all products in a list for a summary view
+'''
+order_summary_units = y.loc[y.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state','new_v_old'])['combined'].apply(', \n'.join)
+
+'''
+order_total:
+1. concats order_summary_margin + order_summary_units to get master view 
+'''
 order_total = pd.concat([order_summary_margin,order_summary_units],axis=1)
 order_total = order_total[['combined','weight_total','product_price_x_quantity','Total_Margin_Order']]
 
+'''
+order_total_ship_log:
+1. takes order_total & merges with shipping information that Wendy types in
+
+'''
 order_total_ship_log = pd.merge(order_total.reset_index().set_index('transaction_id'),
                                 ship_log[['Order #','Actual Freight Expense']].drop_duplicates().set_index('Order #'),
                                 how='left',
                                 left_index=True,
                                 right_index=True)
 
+'''
+discount_fix
+1. pull in discounts to add back to compute net margin
+
+'''
+discount_fix = y[['transaction_id','discount_total']].drop_duplicates().set_index('transaction_id')
+
+#pull in discount_fix
+order_total_ship_log = pd.merge(order_total_ship_log,discount_fix, how='left', left_index=True, right_index=True)
+
+#resetting index
 order_total_ship_log.index = order_total_ship_log.index.set_names('Order #')
 order_total_ship_log = order_total_ship_log.set_index('transaction_date',append=True)
 
-order_total_ship_log['Net_Margin'] = \
-    order_total_ship_log['Total_Margin_Order'] + \
-    10 - \
-    order_total_ship_log['Actual Freight Expense']
+'''
+determine if order qualified for free shipping
+'''
+transactions_with_free_shipping  = y[y['shipping_total'].eq(0)]['transaction_id']
+order_total_ship_log['Free_Shipping'] = np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_free_shipping),'Yes','No')
 
+
+'''
+order_total_ship_log:
+1. Net_Margin - 
+1a. calc by taking Total_Margin_Order for entire order
+1b. pull out discount_total
+1c. adding $10 since we're saying all that shipping is $10
+1d. subtracting out actual Fedex Freight expense by office spreadsheet 
+'''
+order_total_ship_log['Net_Margin'] = np.where(order_total_ship_log['Free_Shipping']=='Yes',
+                                          (order_total_ship_log['Total_Margin_Order'] +
+                                               order_total_ship_log['discount_total'] -
+                                               order_total_ship_log['Actual Freight Expense']),
+                                          (order_total_ship_log['Total_Margin_Order'] +
+                                           order_total_ship_log['discount_total'] +
+                                           10 -
+                                           order_total_ship_log['Actual Freight Expense']) )
+
+#is Net_Margin >= to 0?
 order_total_ship_log['Positive/Negative'] = np.where(order_total_ship_log['Net_Margin'].ge(0),'Good','Bad')
 
+#was this discounted
+order_total_ship_log['Discount'] = np.where(order_total_ship_log['discount_total'].ne(0),"Yes","No")
+
+'''
+summary:
+cover sheet
+'''
 #summary of actions
 summary = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()]
 
@@ -159,18 +223,14 @@ summary = summary.rename({'product_price_x_quantity':'Total Revenue (not includi
                           'Actual Freight Expense':'Actual Freight Expense',
                          "Net_Margin" : "Net Margin after Shipping"})
 
-
-
-
 '''
 DataFrame for plotting scatterplots
 '''
-p = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()].reset_index()
-
-#:TODO look at how many pieces vs. shipping costs
-# FedEx Part 2 - will replace above lookup stuff if figured out
-
-#:TODO needs to be cleaned up
+plot_df = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()].reset_index()
+'''
+Pulling in Fedex pricing zones
+'''
+#create lookup table from FedEx bill; point is to join states to pricing zones for easier aggregation
 k = fed.loc[fed['Pricing zone'].notnull() &
             fed['Pricing zone'].ne('Non Zone')][['Pricing zone','Recipient State/Province','Shipment Tracking Number']].drop_duplicates()
 k['Pricing zone'] = k['Pricing zone'].astype(int)
@@ -178,22 +238,59 @@ kk = k.groupby(['Recipient State/Province','Pricing zone']).agg(count = ('Shipme
 kk = kk.sort_values(by=['Recipient State/Province','count'],ascending=[True,False]).groupby(level=0).head(1)
 kk = kk.reset_index().drop('count',axis=1)
 kl = kk.groupby('Pricing zone')['Recipient State/Province'].apply(list).reset_index()
-
-kl.reset_index()
 kl['Zone-State'] = kl['Pricing zone'].astype(str)+ "-" + kl['Recipient State/Province'].astype(str)
 kkk = pd.merge(kk.set_index('Pricing zone'), kl.set_index('Pricing zone'), left_index=True, right_index=True).reset_index()
-n = pd.merge(p, kkk[['Recipient State/Province_x','Zone-State']], left_on=['customer_state'], right_on=['Recipient State/Province_x']).drop('Recipient State/Province_x', axis=1)
-n['New_v_Old_Pricing'] = np.where(n['transaction_date'].ge('2020-03-25'),'New Pricing','Old Pricing')
 
-#THIS WORKS AS INTENDED
-# sns.scatterplot(x='weight_total',y='Net_Margin', hue='Zone-State', style='New_v_Old_Pricing', data=n).set(title='Weight v Net Margin as of 2020-04-10')
+'''
+plot:
+-contains order_total_ship_log + FedEx shipping locations 
+'''
+plot = pd.merge(plot_df, kkk[['Recipient State/Province_x','Zone-State']], left_on=['customer_state'], right_on=['Recipient State/Province_x']).drop('Recipient State/Province_x', axis=1)
 
-# sns.pairplot(n[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Net_Margin','Actual Freight Expense','Positive/Negative','New_v_Old_Pricing']], kind='scatter', diag_kind = 'hist',hue='New_v_Old_Pricing').savefig('teest2.png')
+def joint_plot_function(df_master, x, y, hue, hue_option):
+    '''
 
-# sns.pairplot(n[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Net_Margin','Actual Freight Expense','Positive/Negative']], kind='scatter', diag_kind = 'hist',hue='Positive/Negative').savefig('teest.png')
+    Parameters
+    ----------
+    df_master : df to pass that has all data
+    x: data for x-axis
+    y: data for y-axis
+    hue : column to split data on
+    hue_option : one of two values to filter df_master on; 'No' or 'Good' depending on hue column
 
-#:TODO figure out groupby to get max for each state
-#:TODO delete all of below, including p1 p2
+    Returns
+    -------
+    creates plot with scatterplot & histograms; allows for 'hue' argument
+
+    '''
+    df_master = df_master.loc[df_master['weight_total'].lt(45)]
+    g = sns.JointGrid(x=x, y=y, data=df_master)
+    g_1 = df_master.loc[df_master[hue].eq(hue_option)]
+    g_2 = df_master.loc[df_master[hue].ne(hue_option)]
+
+    sns.scatterplot(x=g_1[x], y=g_1[y],
+                    color='r',
+                    label=df_master.loc[df_master[hue].eq(hue_option)][hue].unique(),
+                    ax=g.ax_joint)
+    sns.scatterplot(x=g_2[x], y=g_2[y],
+                    color='b',
+                    label=df_master.loc[df_master[hue].ne(hue_option)][hue].unique(),
+                    ax=g.ax_joint)
+    sns.distplot(g_1[x], kde=False, color='r', ax=g.ax_marg_x)
+    sns.distplot(g_2[x], kde=False, color='b', ax=g.ax_marg_x)
+    sns.distplot(g_1[y], kde=False, color='r', ax=g.ax_marg_y, vertical=True)
+    sns.distplot(g_2[y], kde=False, color='b', ax=g.ax_marg_y, vertical=True)
+    plt.suptitle('Impact of ' + hue + ' on ' + x + ' and ' + y)
+    plt.savefig('Impact of ' + hue + ' on ' + x + ' and ' + y)
+
+#:TODO have to set fig size
+
+
+# sns.pairplot(plot[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Net_Margin','Actual Freight Expense','Positive/Negative','new_v_old']], kind='scatter', diag_kind = 'hist',hue='New_v_Old_Pricing')
+
+# sns.pairplot(plot[['weight_total','product_price_x_quantity','Total_Margin_Order','Actual Freight Expense','Positive/Negative']], kind='scatter', diag_kind = 'hist',hue='Positive/Negative')
+
+
 
 
 df_list = [summary, order_total_ship_log, order_details, order_total ]
@@ -304,8 +401,6 @@ def fedex_log_printout(start):
     return f[['transaction_id','customer','customer_phone','item_code','product_normalized','units_total']]
 
 
-
-
 #print(len(a),len(b),len(c),len(d))
 
 '''
@@ -336,26 +431,7 @@ sns.distplot(m2['updated_margin'],kde=False, color='r', ax=g.ax_marg_y, vertical
 sns.distplot(m1['updated_margin'],kde=False, color='b', ax=g.ax_marg_y, vertical=True)
 '''
 
-# '''
-# put above in function
-# def joint_plot_free_shipping(df, df1, df2, thresh):
-#     '''
-#
-#     :param df: master df to pass; usually 'n'
-#     :type df:
-#     :param df1:
-#     :type df1:
-#     :param df2:
-#     :type df2:
-#     :param thresh:
-#     :type thresh:
-#     :return:
-#     :rtype:
-#     '''
-#     #
-#     df.loc
-#
-# '''
+
 
 '''
 new 2020-06-15
