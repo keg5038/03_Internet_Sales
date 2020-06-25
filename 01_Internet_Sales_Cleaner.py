@@ -252,7 +252,7 @@ def joint_plot_function(df_master, x, y, hue, hue_option):
 
     Parameters
     ----------
-    df_master : df to pass that has all data
+    df_master : df to pass that has all data; ususally plot
     x: data for x-axis
     y: data for y-axis
     hue : column to split data on
