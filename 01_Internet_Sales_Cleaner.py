@@ -16,8 +16,11 @@ import calendar
 from pandas.tseries.offsets import MonthEnd
 from numbers import Number
 import a_functions as a_fun
+import weekly_transactions
 import math
 from glob import glob
+
+
 sns.set_style('whitegrid')
 
 #new to change width

@@ -10,10 +10,25 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as md
 from xlsxwriter.utility import xl_rowcol_to_cell
 import matplotlib.ticker as ticker
+import a_functions as a_fun
 
-def week_review(df, start, end)
+today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
 
-    x = df.loc[df.transaction_date.ge(start) & df.transaction_date.ge(end)]
+def week_review(df, start, end):
+    '''
+
+    Parameters
+    ----------
+    df: dataframe to use; y is best to use
+    start: start date to use
+    end: end date - should be the last day of month to include
+
+    Returns
+    -------
+    Excel spreadsheet with four tabs
+    '''
+
+    x = df.loc[df.transaction_date.ge(start) & df.transaction_date.le(end)]
 
     daily_backup = x.groupby(pd.Grouper(key='transaction_date', freq='d'))\
         .agg(NumOfTransactions=('transaction_id', 'nunique'),
@@ -26,9 +41,13 @@ def week_review(df, start, end)
 
     weekly_summary = weekly_backup.describe()
 
-    return daily_backup, daily_summary, weekly_backup,weekly_summary
+    # return daily_backup, daily_summary, weekly_backup,weekly_summary
+    dfs = [daily_summary,daily_backup, weekly_summary, weekly_backup]
 
 
-#:TODO add in function calls to make spreadsheet
+    a_fun.dfs_tab(dfs,
+                  ['Daily Summary','Daily Details','Weekly Summary','Weekly Details'],
+                  'Summary Data as of.xlsx')
+
 
 
