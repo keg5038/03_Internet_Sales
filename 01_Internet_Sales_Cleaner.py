@@ -118,6 +118,8 @@ y['units_total'] = y['product_quantity'] * y['units_normalized']
 #this was wrong - make sure weight_total was right
 y['weight_total'] = y['product_quantity'] * y['product_weight']
 
+#added 10-19-20 create new column w/ shipping information
+
 #creating dataframe with details
 date_to_use = '2020-03-23'
 '''
@@ -129,7 +131,7 @@ order_details:
 
 '''
 order_details = y.loc[y.transaction_date.ge(date_to_use)]\
-    .groupby(['transaction_id','transaction_date','customer_last_name','customer_state','new_v_old',
+    .groupby(['transaction_id','transaction_date','customer_last_name','customer_state',
                            'customer_postal_code','product_name','product_quantity','product_weight','product_options'])\
     .agg({'product_price_x_quantity':'sum','distributor_price':'sum','product_total':'sum','product_price':'sum','weight_total':'sum'})\
     .assign(Margin_Per_Product = lambda x: x['product_price'] - x['distributor_price'])\
@@ -142,13 +144,13 @@ order_details = order_details[['product_quantity','product_price','weight_total'
 order_summary_margin:
 1. takes order_details & aggregates by first four levels to get summary for entire order
 '''
-order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3,4]).sum()
+order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3]).sum()
 
 '''
 order_summary_units:
 1. dataframe to put all products in a list for a summary view
 '''
-order_summary_units = y.loc[y.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state','new_v_old'])['combined'].apply(', \n'.join)
+order_summary_units = y.loc[y.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])['combined'].apply(', \n'.join)
 
 '''
 order_total:
@@ -184,11 +186,35 @@ order_total_ship_log = order_total_ship_log.set_index('transaction_date',append=
 
 '''
 determine if order qualified for free shipping
+old
 '''
+# transactions_with_free_shipping  = y[y['shipping_total'].eq(0)]['transaction_id']
+# order_total_ship_log['Free_Shipping'] = np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_free_shipping),'Yes','No')
+
+'''
+new 2020-10-19
+need to adjust for free shipping > 59
+need to adjust for 5 shipping > 29 
+'''
+
+#use np.select:
+# cond = [y.shipping_total.eq(0), y.shipping_total.eq(5)]
+# choices = ['Free_Shipping','Discounted']
+# order_total_ship_log['Shipping_Tiers'] = np.select(cond,choices,default='No_Discount')
+
 transactions_with_free_shipping  = y[y['shipping_total'].eq(0)]['transaction_id']
-order_total_ship_log['Free_Shipping'] = np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_free_shipping),'Yes','No')
+transactions_with_discount_shipping = y[y['shipping_total'].eq(5)]['transaction_id']
+
+#if shipping = 0 Free_Shipping
+#if shipping = 5 Discounted
+order_total_ship_log['Shipping_Tiers'] = np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_free_shipping),\
+    'Free_Shipping', (np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_discount_shipping),\
+        'Discounted',"No_Shipping_Discount")))
 
 
+
+
+#old way
 '''
 order_total_ship_log:
 1. Net_Margin - 
@@ -196,7 +222,7 @@ order_total_ship_log:
 1b. pull out discount_total
 1c. adding $10 since we're saying all that shipping is $10
 1d. subtracting out actual Fedex Freight expense by office spreadsheet 
-'''
+
 order_total_ship_log['Net_Margin'] = np.where(order_total_ship_log['Free_Shipping']=='Yes',
                                           (order_total_ship_log['Total_Margin_Order'] +
                                                order_total_ship_log['discount_total'] -
@@ -205,12 +231,49 @@ order_total_ship_log['Net_Margin'] = np.where(order_total_ship_log['Free_Shippin
                                            order_total_ship_log['discount_total'] +
                                            10 -
                                            order_total_ship_log['Actual Freight Expense']) )
+'''
+#new way
+'''
+order_total_ship_log:
+1.Net_Margin
+1a. 
+
+'''
+def net_margin(df_use):
+    if df_use['Shipping_Tiers'] == "Free_Shipping":
+        ##free shipping = 0 in shipping_total column
+        margin = df_use['Total_Margin_Order'] + \
+                    df_use['discount_total'] - \
+                    df_use['Actual Freight Expense']
+        return margin
+
+    elif df_use['Shipping_Tiers'] == 'Discounted':
+        ##discounted shipping = 0 in shipping_total column
+        margin = df_use['Total_Margin_Order'] + \
+                    df_use['discount_total'] + \
+                    5 - \
+                    df_use['Actual Freight Expense']
+        return margin
+
+    else:
+        margin = df_use['Total_Margin_Order'] + \
+                    df_use['discount_total'] + \
+                    10 - \
+                    df_use['Actual Freight Expense']
+        return margin
+
+order_total_ship_log['Net_Margin'] = order_total_ship_log.apply(net_margin, axis=1)
+
+
+
 
 #is Net_Margin >= to 0?
 order_total_ship_log['Positive/Negative'] = np.where(order_total_ship_log['Net_Margin'].ge(0),'Good','Bad')
 
 #was this discounted
 order_total_ship_log['Discount'] = np.where(order_total_ship_log['discount_total'].ne(0),"Yes","No")
+
+order_total_ship_log['Shipping_Discount?'] = np.where(order_total_ship_log['Shipping_Tiers'].eq('No_Shipping_Discount'),"No",'Yes')
 
 '''
 summary:
@@ -250,7 +313,7 @@ plot:
 '''
 plot = pd.merge(plot_df, kkk[['Recipient State/Province_x','Zone-State']], left_on=['customer_state'], right_on=['Recipient State/Province_x']).drop('Recipient State/Province_x', axis=1)
 
-def joint_plot_function(df_master, x, y, hue, hue_option):
+def joint_plot_function(df_master=plot, x='product_price_x_quantity', y='Net_Margin', hue='Shipping_Discount?', hue_option='No'):
     '''
 
     Parameters
@@ -316,8 +379,8 @@ def unique_sales(df_use):
     '''
 
     #looking at email addresses
-    email = df_use.groupby(['customer_email','Pre_Post']).agg(Count = ('transaction_id','nunique'),
-             Last_Date = ('transaction_date','max'),
+    email = df_use.groupby(['customer_email','Pre_Post']).agg(Count = ('transaction_id','nunique'),\
+             Last_Date = ('transaction_date','max'), \
              First_Date = ('transaction_date','min')).unstack().fillna(0)
 
     e1 = email['Count','Pre'].ne(0)
@@ -448,7 +511,7 @@ b = y.loc[y.product_price_x_quantity.lt(59) & y.transaction_date.ge('2020-03-01'
 pd.concat([a,b],join='outer', axis=1).assign(Percent_of_Total_Transactions = lambda x: x['NumTransactions_over_59'] / (x['NumTransactions_over_59'] + x['NumTransactions_under_59'] ))
 '''
 
-a_fun.dfs_tab(df_list,df_names,workbook_name )
+# a_fun.dfs_tab(df_list,df_names,workbook_name )
 
 
 print(df)
