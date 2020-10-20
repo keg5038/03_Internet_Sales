@@ -511,6 +511,51 @@ b = y.loc[y.product_price_x_quantity.lt(59) & y.transaction_date.ge('2020-03-01'
 pd.concat([a,b],join='outer', axis=1).assign(Percent_of_Total_Transactions = lambda x: x['NumTransactions_over_59'] / (x['NumTransactions_over_59'] + x['NumTransactions_under_59'] ))
 '''
 
+'''
+New plotting:
+
+df['Year'] = df.transaction_date.dt.year
+df['WeekofYear'] = df.transaction_date.dt.weekofyear
+p = df.loc[df.transaction_date.ge('2017-01-01')]
+
+pa = p.groupby(['Year','WeekofYear'], dropna=False).agg(Unique_Transactions=('transaction_id','nunique'),Sales =('order_total','sum')).unstack(0).fillna(0).stack().fillna(0).reset_index()
+fig,(ax1, ax2, ax3) = plt.subplots(nrows=3,ncols=1, sharex=True, sharey=True, constrained_layout=True, figsize =(12,9))
+ax1.yaxis.set_major_formatter('${x:,.0f}')
+ax1.set_ylim((0,6000))
+
+pa.loc[pa['Year'].eq(2018)].plot(kind='bar',x='WeekofYear',y='Sales', ax=ax1)
+ax1.set_title('2018')
+
+pa.loc[pa['Year'].eq(2019)].plot(kind='bar',x='WeekofYear',y='Sales', ax=ax2)
+ax2.set_title('2019')
+
+pa.loc[pa['Year'].eq(2020)].plot(kind='bar',x='WeekofYear',y='Sales', ax=ax3)
+ax3.set_title('2020')
+ax3.set_xlabel('Week of Year')
+fig.suptitle("Online Sales Revenue by Week",fontsize=16)
+plt.savefig('Weekly Sales by Revenue.jpg')
+plt.show()
+
+#weekly transactions:
+fig,(ax1, ax2, ax3) = plt.subplots(nrows=3,ncols=1, sharex=True, sharey=True, constrained_layout=True, figsize =(12,9))
+
+pa.loc[pa['Year'].eq(2018)].plot(kind='bar',x='WeekofYear',y='Unique_Transactions', ax=ax1, color='green')
+ax1.set_title('2018')
+
+pa.loc[pa['Year'].eq(2019)].plot(kind='bar',x='WeekofYear',y='Unique_Transactions', ax=ax2,color='green')
+ax2.set_title('2019')
+
+pa.loc[pa['Year'].eq(2020)].plot(kind='bar',x='WeekofYear',y='Unique_Transactions', ax=ax3,color='green')
+ax3.set_title('2020')
+ax3.set_xlabel('Week of Year')
+fig.suptitle("Online Weekly Unique Transactions",fontsize=16)
+plt.savefig('Weekly Unique Transactions.jpg')
+plt.show()
+
+
+
+'''
+
 # a_fun.dfs_tab(df_list,df_names,workbook_name )
 
 
