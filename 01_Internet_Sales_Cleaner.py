@@ -123,6 +123,7 @@ y['weight_total'] = y['product_quantity'] * y['product_weight']
 y['coupon_normalized'] = y['coupons_used'].str.split(":").str[0].unique()
 
 
+y.iloc[3]
 #creating dataframe with details
 date_to_use = '2020-03-23'
 '''
