@@ -3,6 +3,7 @@ Import & normalize retail sales data
 
 '''
 
+from os.path import join
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -118,7 +119,9 @@ y['units_total'] = y['product_quantity'] * y['units_normalized']
 #this was wrong - make sure weight_total was right
 y['weight_total'] = y['product_quantity'] * y['product_weight']
 
-#added 10-19-20 create new column w/ shipping information
+#add in coupons used to make sense of discount
+y['coupon_normalized'] = y['coupons_used'].str.split(":").str[0].unique()
+
 
 #creating dataframe with details
 date_to_use = '2020-03-23'
@@ -213,25 +216,6 @@ order_total_ship_log['Shipping_Tiers'] = np.where(order_total_ship_log.index.get
 
 
 
-
-#old way
-'''
-order_total_ship_log:
-1. Net_Margin - 
-1a. calc by taking Total_Margin_Order for entire order
-1b. pull out discount_total
-1c. adding $10 since we're saying all that shipping is $10
-1d. subtracting out actual Fedex Freight expense by office spreadsheet 
-
-order_total_ship_log['Net_Margin'] = np.where(order_total_ship_log['Free_Shipping']=='Yes',
-                                          (order_total_ship_log['Total_Margin_Order'] +
-                                               order_total_ship_log['discount_total'] -
-                                               order_total_ship_log['Actual Freight Expense']),
-                                          (order_total_ship_log['Total_Margin_Order'] +
-                                           order_total_ship_log['discount_total'] +
-                                           10 -
-                                           order_total_ship_log['Actual Freight Expense']) )
-'''
 #new way
 '''
 order_total_ship_log:
@@ -349,14 +333,13 @@ def joint_plot_function(df_master=plot, x='product_price_x_quantity', y='Net_Mar
     plt.suptitle('Impact of ' + hue + ' on ' + x + ' and ' + y)
     plt.savefig('Impact of ' + hue + ' on ' + x + ' and ' + y)
 
+joint_plot_function()
 #:TODO have to set fig size
 
 
 # sns.pairplot(plot[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Net_Margin','Actual Freight Expense','Positive/Negative','new_v_old']], kind='scatter', diag_kind = 'hist',hue='New_v_Old_Pricing')
 
 # sns.pairplot(plot[['weight_total','product_price_x_quantity','Total_Margin_Order','Actual Freight Expense','Positive/Negative']], kind='scatter', diag_kind = 'hist',hue='Positive/Negative')
-
-
 
 
 df_list = [summary, order_total_ship_log, order_details, order_total ]
@@ -424,24 +407,6 @@ def unique_sales(df_use):
 
     return email_common, cust_post_common, ship_post_common, ship_name_common
 
-## Looking at unique email vs. unique transactions
-# before = a.index.get_level_values(0)
-# df['Repeat_v_New'] = np.where(df['customer_email'].isin(before),'Repeat_Customer','New_Customer')
-# df.groupby(['Pre_Post','Repeat_v_New']).agg(uni_email = ('customer_email','nunique'), uniq_tran = ('transaction_id','nunique'))
-
-
-#looking at sales of units
-'''
-s = y.loc[y['transaction_date'].ge('2020-03-16')]\
-    .groupby(['product_normalized','case_v_unit',pd.Grouper(key='transaction_date',freq='W')])\
-    .agg({'product_quantity':'sum','units_total':'sum','transaction_id':'nunique'})\
-    .unstack().fillna(0).sort_index(1).sort_index(level=[0,1],ascending=[True,False])
-    
-poc = y.loc[(y['transaction_date'].le('2020-03-22') & y['transaction_date'].ge('2020-03-15')) & (y.product_normalized.str.contains('pocono cre',case=False))]
-
-'''
-
-
 def fedex_log_printout(start):
     '''
 
@@ -467,53 +432,12 @@ def fedex_log_printout(start):
     return f[['transaction_id','customer','customer_phone','item_code','product_normalized','units_total']]
 
 
-#print(len(a),len(b),len(c),len(d))
+
+#:TODO turn this into a function
+
+# New plotting:
 
 '''
-looking at new pricing on free shipping
-2020/06/04
-
-# :TODO do same math, but on what $5 shipping would look like on orders over a certain threshold;  
-m = n.loc[n['weight_total'].lt(45)]
-m['ship_thresh'] =np.where(m['product_price_x_quantity'].ge(59),'Free','Not_Free')
-m['updated_margin'] = np.where(m['ship_thresh'].eq('Free'),m['Net_Margin']-10,m['Net_Margin'])
-sns.pairplot(m[['product_price_x_quantity','updated_margin','Actual Freight Expense','ship_thresh']], kind='scatter', diag_kind = 'hist',hue='ship_thresh')
-
-m2 = m.loc[m['ship_thresh'].eq('Free')]
-m1= m.loc[m['ship_thresh'].eq('Not_Free')]
-g = sns.jointplot(x=m1['product_price_x_quantity'],y=m1['updated_margin'], color='r')
-g.x = m2['product_price_x_quantity']
-g.y = m2['updated_margin']
-g.plot_joint(plt.scatter,marker='x', c='b',s=50)
-g.plot_marginals(plt.hist, c='b')
-
-#this works as intended
-g = sns.JointGrid(x='product_price_x_quantity',y='updated_margin',data=m)
-sns.scatterplot(x =m2['product_price_x_quantity'], y= m2['updated_margin'], color='r', ax=g.ax_joint)
-sns.scatterplot(x =m1['product_price_x_quantity'], y= m1['updated_margin'], color='b', ax=g.ax_joint)
-sns.distplot(m2['product_price_x_quantity'],kde=False, color='r', ax=g.ax_marg_x)
-sns.distplot(m1['product_price_x_quantity'],kde=False, color='b', ax=g.ax_marg_x)
-sns.distplot(m2['updated_margin'],kde=False, color='r', ax=g.ax_marg_y, vertical=True)
-sns.distplot(m1['updated_margin'],kde=False, color='b', ax=g.ax_marg_y, vertical=True)
-'''
-
-
-
-'''
-new 2020-06-15
-looking at weekend sales
-k = y.loc[y.transaction_date.dt.year.ge(2020)].groupby([y['transaction_date'].dt.dayofweek,y['transaction_date'].dt.day_name(),y['transaction_date'].dt.weekofyear]).agg(UniqueTransactions=('transaction_id','nunique'), DollarSales = ('product_price_x_quantity','sum')).assign(AvgTicket = lambda x: x['DollarSales'] / x['UniqueTransactions'])
-
-y.loc[y.transaction_date.dt.year.ge(2020)].groupby([y['transaction_date'].dt.dayofweek,y['transaction_date'].dt.day_name(),y['transaction_date'].dt.weekofyear]).agg(UniqueTransactions=('transaction_id','nunique'), DollarSales = ('product_price_x_quantity','sum')).assign(AvgTicket = lambda x: x['DollarSales'] / x['UniqueTransactions']).loc[idx[:,:,12:],idx[:]].unstack([-1])
-
-a = y.loc[y.product_price_x_quantity.ge(59) & y.transaction_date.ge('2020-03-01')].groupby([pd.Grouper(key='transaction_date',freq='W-MON')]).agg(NumTransactions_over_59 = ('transaction_id','nunique'))
-b = y.loc[y.product_price_x_quantity.lt(59) & y.transaction_date.ge('2020-03-01')].groupby([pd.Grouper(key='transaction_date',freq='W-MON')]).agg(NumTransactions_under_59 = ('transaction_id','nunique'))
-pd.concat([a,b],join='outer', axis=1).assign(Percent_of_Total_Transactions = lambda x: x['NumTransactions_over_59'] / (x['NumTransactions_over_59'] + x['NumTransactions_under_59'] ))
-'''
-
-'''
-New plotting:
-
 df['Year'] = df.transaction_date.dt.year
 df['WeekofYear'] = df.transaction_date.dt.weekofyear
 p = df.loc[df.transaction_date.ge('2017-01-01')]
@@ -551,12 +475,20 @@ ax3.set_xlabel('Week of Year')
 fig.suptitle("Online Weekly Unique Transactions",fontsize=16)
 plt.savefig('Weekly Unique Transactions.jpg')
 plt.show()
-
-
-
 '''
 
-# a_fun.dfs_tab(df_list,df_names,workbook_name )
+'''
+#look at Thanksgiving holidays
+#2018: 11/22 - 11/25 2018 -
+#2019: 11/28 - 12/01
+#2020: 11/26 - 11/29
+
+mask1 = df['transaction_date'].ge('2018-11-22') & df['transaction_date'].le('2018-11-26')
+mask2 = df['transaction_date'].ge('2019-11-28') & df['transaction_date'].le('2019-12-02')
+mask3 = df['transaction_date'].ge('2020-11-26') & df['transaction_date'].le('2020-11-30')
+p = df.loc[mask1 | mask2 | mask3]
+p.groupby(['Year']).agg(Unique_Transactions=('transaction_id','nunique'),Sales=('product_price_x_quantity','sum'))
+p.iloc[3]
+'''# a_fun.dfs_tab(df_list,df_names,workbook_name )
 
 
-print(df)
