@@ -35,54 +35,60 @@ today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
 os.chdir(os.path.join(os.getenv('HOME'),
     'Dropbox/BKM - Marketing/Web Sales'))
 
-
+#import df from all csv files from internet transactions
 df = pd.concat([pd.read_csv(f) for f in glob ('./CSV_Files_2020-02/*.csv')])
-print(df)
-'''
-Cleaning for Online Orders Sheet
-'''
-df['transaction_date'] = pd.to_datetime(df.transaction_date)
 
-#dropping duplicates in case dates of pulls are messed up
-df = df.drop_duplicates()
-#have to sort to ffill
-df = df.sort_values(['transaction_id','transaction_date'])
-#way to fillna only based on transaction_id
-df.loc[:,:'category_code'] = df.loc[:,:'category_code'].fillna(df.groupby('transaction_id').ffill())
-#cleaning product_name
-df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
+def clean_df(df=df):
+    '''
+    Cleaning for Online Orders Sheet
+    '''
+    df['transaction_date'] = pd.to_datetime(df.transaction_date)
 
-#added in because
-#product_price_x_quantity - multiples product_price x product_quantity from original dataframe
-df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
+    #dropping duplicates in case dates of pulls are messed up
+    df = df.drop_duplicates()
+    #have to sort to ffill
+    df = df.sort_values(['transaction_id','transaction_date'])
+    #way to fillna only based on transaction_id
+    df.loc[:,:'category_code'] = df.loc[:,:'category_code'].fillna(df.groupby('transaction_id').ffill())
+    #cleaning product_name
+    df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
 
-#needed to fill in blanks
-df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
+    #added in because
+    #product_price_x_quantity - multiples product_price x product_quantity from original dataframe
+    df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
 
-#pre_post = email blast, not when shipping changes were implemented
-df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
+    #needed to fill in blanks
+    df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
+
+    #pre_post = email blast, not when shipping changes were implemented
+    df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
+
+    return df
 
 
-'''
-Cleaning FedEx File
+def clean_fed():
+    '''
+    Cleaning FedEx File
 
-'''
-fed = pd.concat([pd.read_csv(f) for f in glob ('./FedEx_Files/*.csv')])
+    '''
+    fed = pd.concat([pd.read_csv(f) for f in glob ('./FedEx_Files/*.csv')])
 
-def date_cleaner(df):
-    #fixes dates for fedex file
     cols = ['Shipment Date(mm/dd/yyyy)','Shipment Delivery Date (mm/dd/yyyy)','Invoice Date (mm/dd/yyyy)']
     for col in cols:
         fed[col] = pd.to_datetime(fed[col],format="%m/%d/%Y")
 
-    return fed
-
-fed = date_cleaner(fed)
-
-fed = fed.rename(columns={'Shipment Date(mm/dd/yyyy)':'Date_Shipment',
+    fed = fed.rename(columns={'Shipment Date(mm/dd/yyyy)':'Date_Shipment',
                               'Shipment Delivery Date (mm/dd/yyyy)':'Date_Delivery',
                               'Invoice Date (mm/dd/yyyy)':'Date_Invoice'})
-fed = fed.drop_duplicates().sort_values('Date_Invoice')
+    fed = fed.drop_duplicates().sort_values('Date_Invoice')
+
+    return fed
+
+df = clean_df()
+
+fed = clean_fed()
+
+
 
 '''
 Pricing Spreadsheet to Pull up Distributor Pricing
