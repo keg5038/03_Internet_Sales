@@ -89,7 +89,6 @@ df = clean_df()
 fed = clean_fed()
 
 
-
 '''
 Pricing Spreadsheet to Pull up Distributor Pricing
 '''
@@ -101,35 +100,39 @@ Shipping Document - where we pull in from the office sheet
 ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
                                      'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
 
-'''
-Fedex sheet for labels
-'''
-'''label = pd.read_csv(os.path.join(os.getenv('HOME'),
-                                     'Dropbox/BKM - Marketing/Web Sales/FedEx_Files/fedex_upload_master.csv'))'''
+
+def prepare_df(df=df, start='2018-01-01'):
+    """Return dataframe combined with transaction log & product df'
+
+    Args:
+        df ([type], optional): [description]. Defaults to df.
+        start (str, optional): [description]. Defaults to '2018-01-01'.
+
+    Returns:
+        [type]: [description]
+    """    
+    x = df.loc[df['transaction_date'].ge(start)]
+    '''
+    y - 
+    Dataframe shows all transactions since 2018, merged with pricing spreadsheet (price)
+    '''
+    y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
+    y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
+    y['units_total'] = y['product_quantity'] * y['units_normalized']
+    #this was wrong - make sure weight_total was right
+    y['weight_total'] = y['product_quantity'] * y['product_weight']
+
+    #add in coupons used to make sense of discount
+    y['coupon_normalized'] = y['coupons_used'].str.split(":").str[0]
+    y['coupon_used?'] = np.where(y['coupon_normalized'].eq('-'),'No','Yes')
+
+    return y
 
 
-'''
-This is to pull info for Andrew
-'''
-# x is just filtered dataframed
-#changed 6/4
-x = df.loc[df['transaction_date'].ge('2018')]
-
-'''
-y - 
-Dataframe shows all transactions since 2018, merged with pricing spreadsheet (price)
-'''
-y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
-y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
-y['units_total'] = y['product_quantity'] * y['units_normalized']
-#this was wrong - make sure weight_total was right
-y['weight_total'] = y['product_quantity'] * y['product_weight']
-
-#add in coupons used to make sense of discount
-y['coupon_normalized'] = y['coupons_used'].str.split(":").str[0].unique()
-
-
+y = prepare_df()
+ 
 y.iloc[3]
+
 #creating dataframe with details
 date_to_use = '2020-03-23'
 '''
