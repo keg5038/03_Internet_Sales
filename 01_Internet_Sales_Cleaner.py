@@ -128,111 +128,93 @@ def prepare_df(df=df, start='2018-01-01'):
 
     return y
 
+def order_details(df=prepare_df(), date_to_use='2020-03-23'):
+    '''
+    order_details:
+    1. filters data based on 'date_to_use'
+    2. aggregates each transaction at a product level
+    3. computes margin_per_product = price_price - distributor_price
+    4. computes Total_Margin_Order = margin_per_order x product_quantity
 
-y = prepare_df()
- 
-y.iloc[3]
-
-#creating dataframe with details
-date_to_use = '2020-03-23'
-'''
-order_details:
-1. filters data based on 'date_to_use'
-2. aggregates each transaction at a product level
-3. computes margin_per_product = price_price - distributor_price
-4. computes Total_Margin_Order = margin_per_order x product_quantity
-
-'''
-order_details = y.loc[y.transaction_date.ge(date_to_use)]\
+    '''
+    order_details = df.loc[df.transaction_date.ge(date_to_use)]\
     .groupby(['transaction_id','transaction_date','customer_last_name','customer_state',
                            'customer_postal_code','product_name','product_quantity','product_weight','product_options'])\
     .agg({'product_price_x_quantity':'sum','distributor_price':'sum','product_total':'sum','product_price':'sum','weight_total':'sum'})\
     .assign(Margin_Per_Product = lambda x: x['product_price'] - x['distributor_price'])\
     .reset_index('product_quantity')\
     .assign(Total_Margin_Order = lambda x: x['product_quantity'] * x['Margin_Per_Product'])
+    
+    order_details = order_details[['product_quantity','product_price','weight_total','product_price_x_quantity','distributor_price','Margin_Per_Product','Total_Margin_Order']]
+    '''
+    order_summary_margin:
+    1. takes order_details & aggregates by first four levels to get summary for entire order
+    '''
+    order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3]).sum()
 
-order_details = order_details[['product_quantity','product_price','weight_total','product_price_x_quantity','distributor_price','Margin_Per_Product','Total_Margin_Order']]
+    return order_summary_margin
 
-'''
-order_summary_margin:
-1. takes order_details & aggregates by first four levels to get summary for entire order
-'''
-order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3]).sum()
+def order_summary_units(df=prepare_df(), date_to_use='2020-03-23'):
+    '''
+    order_summary_units:
+    1. dataframe to put all products in a list for a summary view
+    '''
+    order_summary_units = df.loc[df.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])['combined'].apply(', \n'.join)
 
-'''
-order_summary_units:
-1. dataframe to put all products in a list for a summary view
-'''
-order_summary_units = y.loc[y.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])['combined'].apply(', \n'.join)
+    return order_summary_units
 
-'''
-order_total:
-1. concats order_summary_margin + order_summary_units to get master view 
-'''
-order_total = pd.concat([order_summary_margin,order_summary_units],axis=1)
-order_total = order_total[['combined','weight_total','product_price_x_quantity','Total_Margin_Order']]
+def order_discount(df=prepare_df(), date_to_use='2020-03-23'):
+    '''
+    1. dataframe to pull all discounts used in a list for summary view
+    '''
+    order_discount = df.loc[df.transaction_date.ge('2020-03-23')].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])\
+        .agg({'coupon_used?':lambda x: ', '.join(sorted(x.unique().tolist())),'coupon_normalized':lambda x: ', '.join(sorted(x.unique().tolist()))})
 
-'''
-order_total_ship_log:
-1. takes order_total & merges with shipping information that Wendy types in
+    return order_discount
 
-'''
-order_total_ship_log = pd.merge(order_total.reset_index().set_index('transaction_id'),
-                                ship_log[['Order #','Actual Freight Expense']].drop_duplicates().set_index('Order #'),
-                                how='left',
-                                left_index=True,
-                                right_index=True)
+def order_total():
+    '''
+    order_total:
+    1. concats order_summary_margin + order_summary_units to get master view 
+    2. combine Fedex Shipping Log
+    '''
+    order_total = pd.concat([order_details(),order_summary_units(), order_discount()],axis=1)
+    order_total = order_total[['combined','weight_total','coupon_used?','coupon_normalized','product_price_x_quantity','Total_Margin_Order']]
 
-'''
-discount_fix
-1. pull in discounts to add back to compute net margin
+    order_total_ship_log = pd.merge(order_total.reset_index().set_index('transaction_id'),
+                                    ship_log[['Order #','Actual Freight Expense']].drop_duplicates().set_index('Order #'),
+                                    how='left',
+                                    left_index=True,
+                                    right_index=True)
 
-'''
-discount_fix = y[['transaction_id','discount_total']].drop_duplicates().set_index('transaction_id')
+    '''
+    discount_fix
+    1. pull in discounts to add back to compute net margin
 
-#pull in discount_fix
-order_total_ship_log = pd.merge(order_total_ship_log,discount_fix, how='left', left_index=True, right_index=True)
+    '''
+    discount_fix = y[['transaction_id','discount_total']].drop_duplicates().set_index('transaction_id')
 
-#resetting index
-order_total_ship_log.index = order_total_ship_log.index.set_names('Order #')
-order_total_ship_log = order_total_ship_log.set_index('transaction_date',append=True)
+    #pull in discount_fix
+    order_total_ship_log = pd.merge(order_total_ship_log,discount_fix, how='left', left_index=True, right_index=True)
 
-'''
-determine if order qualified for free shipping
-old
-'''
-# transactions_with_free_shipping  = y[y['shipping_total'].eq(0)]['transaction_id']
-# order_total_ship_log['Free_Shipping'] = np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_free_shipping),'Yes','No')
-
-'''
-new 2020-10-19
-need to adjust for free shipping > 59
-need to adjust for 5 shipping > 29 
-'''
-
-#use np.select:
-# cond = [y.shipping_total.eq(0), y.shipping_total.eq(5)]
-# choices = ['Free_Shipping','Discounted']
-# order_total_ship_log['Shipping_Tiers'] = np.select(cond,choices,default='No_Discount')
-
-transactions_with_free_shipping  = y[y['shipping_total'].eq(0)]['transaction_id']
-transactions_with_discount_shipping = y[y['shipping_total'].eq(5)]['transaction_id']
-
-#if shipping = 0 Free_Shipping
-#if shipping = 5 Discounted
-order_total_ship_log['Shipping_Tiers'] = np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_free_shipping),\
-    'Free_Shipping', (np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_discount_shipping),\
-        'Discounted',"No_Shipping_Discount")))
+    #resetting index
+    order_total_ship_log.index = order_total_ship_log.index.set_names('Order #')
+    order_total_ship_log = order_total_ship_log.set_index('transaction_date',append=True)
 
 
+    transactions_with_free_shipping  = y[y['shipping_total'].eq(0)]['transaction_id']
+    transactions_with_discount_shipping = y[y['shipping_total'].eq(5)]['transaction_id']
 
-#new way
-'''
-order_total_ship_log:
-1.Net_Margin
-1a. 
+    #if shipping = 0 Free_Shipping
+    #if shipping = 5 Discounted
+    order_total_ship_log['Shipping_Tiers'] = np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_free_shipping),\
+        'Free_Shipping', (np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_discount_shipping),\
+            'Discounted',"No_Shipping_Discount")))
 
-'''
+    return order_total_ship_log
+
+order_total = order_total()
+
 def net_margin(df_use):
     if df_use['Shipping_Tiers'] == "Free_Shipping":
         ##free shipping = 0 in shipping_total column
@@ -256,23 +238,33 @@ def net_margin(df_use):
                     df_use['Actual Freight Expense']
         return margin
 
-order_total_ship_log['Net_Margin'] = order_total_ship_log.apply(net_margin, axis=1)
+
+def calculate_net_margin():
+    order_total['Net_Margin'] = order_total.apply(net_margin, axis=1)
+    #is Net_Margin >= to 0?
+    order_total['Positive/Negative'] = np.where(order_total['Net_Margin'].ge(0),'Good','Bad')
+
+    #was this discounted
+    order_total['Discount'] = np.where(order_total['discount_total'].ne(0),"Yes","No")
+
+    order_total['Shipping_Discount?'] = np.where(order_total['Shipping_Tiers'].eq('No_Shipping_Discount'),"No",'Yes')
+
+    return order_total
+    
 
 
-
-
-#is Net_Margin >= to 0?
-order_total_ship_log['Positive/Negative'] = np.where(order_total_ship_log['Net_Margin'].ge(0),'Good','Bad')
-
-#was this discounted
-order_total_ship_log['Discount'] = np.where(order_total_ship_log['discount_total'].ne(0),"Yes","No")
-
-order_total_ship_log['Shipping_Discount?'] = np.where(order_total_ship_log['Shipping_Tiers'].eq('No_Shipping_Discount'),"No",'Yes')
-
+calculate_net_margin()
 '''
 summary:
 cover sheet
 '''
+
+# :TODO fix from here down
+'''
+Fix from here down ->
+
+'''
+
 #summary of actions
 summary = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()]
 
