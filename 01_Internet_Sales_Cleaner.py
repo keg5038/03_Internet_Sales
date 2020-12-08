@@ -92,7 +92,19 @@ fed = clean_fed()
 '''
 Pricing Spreadsheet to Pull up Distributor Pricing
 '''
+#will need to update price if pricing has been updated
+#update the 
 price = pd.read_excel('Product_Pricing.xlsx')
+
+def check_pricing_spreadsheet():
+    #check for new products / price combo
+    x = df.loc[df['transaction_date'].ge('2020-04-01')][['product_name','product_options','product_price','product_weight']].drop_duplicates()
+    y = price[['product_name','product_options','product_price','product_weight']].drop_duplicates()
+
+    return x.merge(y, how='outer',indicator=True).loc[lambda x: x['_merge'].isin(['left_only'])]
+    # .to_excel('Discrepancies.xlsx')
+check_pricing_spreadsheet()
+
 
 '''
 Shipping Document - where we pull in from the office sheet
