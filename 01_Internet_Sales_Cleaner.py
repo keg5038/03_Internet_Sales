@@ -112,8 +112,11 @@ Shipping Document - where we pull in from the office sheet
 ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
                                      'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
 
+date_to_test = '2020-11-15'
+df.iloc[-20]
 
-def prepare_df(df=df, start='2018-01-01'):
+
+def prepare_df(df=df, start=date_to_test):
     """Return dataframe combined with transaction log & product df'
 
     Args:
@@ -139,6 +142,9 @@ def prepare_df(df=df, start='2018-01-01'):
     y['coupon_used?'] = np.where(y['coupon_normalized'].eq('-'),'No','Yes')
 
     return y
+
+prepare_df()
+'''
 
 def order_details(df=prepare_df(), date_to_use='2020-03-23'):
     '''
@@ -179,7 +185,7 @@ def order_discount(df=prepare_df(), date_to_use='2020-03-23'):
     '''
     1. dataframe to pull all discounts used in a list for summary view
     '''
-    order_discount = df.loc[df.transaction_date.ge('2020-03-23')].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])\
+    order_discount = df.loc[df.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])\
         .agg({'coupon_used?':lambda x: ', '.join(sorted(x.unique().tolist())),'coupon_normalized':lambda x: ', '.join(sorted(x.unique().tolist()))})
 
     return order_discount
@@ -204,7 +210,7 @@ def order_total():
     1. pull in discounts to add back to compute net margin
 
     '''
-    discount_fix = y[['transaction_id','discount_total']].drop_duplicates().set_index('transaction_id')
+    discount_fix = df[['transaction_id','discount_total']].drop_duplicates().set_index('transaction_id')
 
     #pull in discount_fix
     order_total_ship_log = pd.merge(order_total_ship_log,discount_fix, how='left', left_index=True, right_index=True)
@@ -214,8 +220,8 @@ def order_total():
     order_total_ship_log = order_total_ship_log.set_index('transaction_date',append=True)
 
 
-    transactions_with_free_shipping  = y[y['shipping_total'].eq(0)]['transaction_id']
-    transactions_with_discount_shipping = y[y['shipping_total'].eq(5)]['transaction_id']
+    transactions_with_free_shipping  = df[df['shipping_total'].eq(0)]['transaction_id']
+    transactions_with_discount_shipping = df[df['shipping_total'].eq(5)]['transaction_id']
 
     #if shipping = 0 Free_Shipping
     #if shipping = 5 Discounted
@@ -226,8 +232,9 @@ def order_total():
     return order_total_ship_log
 
 order_total = order_total()
+order_total.iloc[3]
 
-def net_margin(df_use):
+def net_margin(df_use=df):
     if df_use['Shipping_Tiers'] == "Free_Shipping":
         ##free shipping = 0 in shipping_total column
         margin = df_use['Total_Margin_Order'] + \
@@ -250,7 +257,6 @@ def net_margin(df_use):
                     df_use['Actual Freight Expense']
         return margin
 
-
 def calculate_net_margin():
     order_total['Net_Margin'] = order_total.apply(net_margin, axis=1)
     #is Net_Margin >= to 0?
@@ -262,10 +268,10 @@ def calculate_net_margin():
     order_total['Shipping_Discount?'] = np.where(order_total['Shipping_Tiers'].eq('No_Shipping_Discount'),"No",'Yes')
 
     return order_total
-    
-
-
+ 
 calculate_net_margin()
+'''
+
 '''
 summary:
 cover sheet
@@ -276,7 +282,6 @@ cover sheet
 Fix from here down ->
 
 '''
-
 #summary of actions
 summary = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()]
 
@@ -286,6 +291,13 @@ summary = summary.rename({'product_price_x_quantity':'Total Revenue (not includi
                           'Total_Margin_Order':'Margin on Product v. Distributor Cost',
                           'Actual Freight Expense':'Actual Freight Expense',
                          "Net_Margin" : "Net Margin after Shipping"})
+
+
+
+df_list = [summary, order_total_ship_log, order_details, order_total ]
+df_names = ["Summary",'Margin per Order', 'Details','Backup']
+workbook_name = "Web Orders as of .xlsx"
+
 
 '''
 DataFrame for plotting scatterplots
@@ -354,11 +366,6 @@ joint_plot_function()
 # sns.pairplot(plot[['customer_state','weight_total','product_price_x_quantity','Total_Margin_Order','Net_Margin','Actual Freight Expense','Positive/Negative','new_v_old']], kind='scatter', diag_kind = 'hist',hue='New_v_Old_Pricing')
 
 # sns.pairplot(plot[['weight_total','product_price_x_quantity','Total_Margin_Order','Actual Freight Expense','Positive/Negative']], kind='scatter', diag_kind = 'hist',hue='Positive/Negative')
-
-
-df_list = [summary, order_total_ship_log, order_details, order_total ]
-df_names = ["Summary",'Margin per Order', 'Details','Backup']
-workbook_name = "Web Orders as of .xlsx"
 
 '''
 Looking at repeat customers for shipping
