@@ -188,10 +188,9 @@ def combine_detail_order_fedex():
     m['Good_v_Bad'] = np.where(m['Net_Order_Margin'].ge(0),'Good','Bad')
 
     return m
-#read in fedex file
 
 
-#sanity check this
+#sanity check this get it right order
 combine_detail_order_fedex()
 
 
