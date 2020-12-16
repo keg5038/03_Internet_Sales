@@ -53,15 +53,11 @@ def clean_df(df=df):
     #cleaning product_name
     df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
 
-    #added in because
-    #product_price_x_quantity - multiples product_price x product_quantity from original dataframe
-    df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
-
     #needed to fill in blanks
     df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
 
-    #pre_post = email blast, not when shipping changes were implemented
-    df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
+    # #pre_post = email blast, not when shipping changes were implemented
+    # df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
 
     return df
 
@@ -112,11 +108,10 @@ Shipping Document - where we pull in from the office sheet
 ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
                                      'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
 
-date_to_test = '2020-11-15'
-df.iloc[-20]
+date_to_test = '2020-12-05'
+df.loc[:,:'category_code']
 
-
-def prepare_df(df=df, start=date_to_test):
+def combine_df_price(df=df, start=date_to_test):
     """Return dataframe combined with transaction log & product df'
 
     Args:
@@ -132,54 +127,54 @@ def prepare_df(df=df, start=date_to_test):
     Dataframe shows all transactions since 2018, merged with pricing spreadsheet (price)
     '''
     y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
-    y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
+    return y
+
+def order_details(df=combine_df_price()):
+    #:TODO this is where left off
+    #order details
+    y = df
+    #product_price_x_quantity - multiples product_price x product_quantity from original dataframe
+    y['product_price_x_quantity'] = y['product_price'] * y['product_quantity']
+
+    y['product_units'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
     y['units_total'] = y['product_quantity'] * y['units_normalized']
+
     #this was wrong - make sure weight_total was right
     y['weight_total'] = y['product_quantity'] * y['product_weight']
 
+    y['net_margin_per_item'] = y['product_quantity'] * (y['product_price'] - y['distributor_price'])
+
+    #getting units in simple 
+    z = y.groupby('transaction_id')['product_units'].apply(', \n'.join)
+
+    #order summary info
+    x = df.set_index('transaction_id').loc[:,:'category_code'].reset_index().drop_duplicates()
+
     #add in coupons used to make sense of discount
-    y['coupon_normalized'] = y['coupons_used'].str.split(":").str[0]
-    y['coupon_used?'] = np.where(y['coupon_normalized'].eq('-'),'No','Yes')
+    x['coupon_normalized'] = x['coupons_used'].str.split(":").str[0]
+    x['coupon_used?'] = np.where(x['coupon_normalized'].eq('-'),'No','Yes')
 
-    return y
+    #pull in shipping rate
+    x['shipping_total'] = 
+    
+    x = x[['transaction_id','transaction_date','shipping_state','shipping_postal_code','coupon_normalized','coupon_used','shipping_total']].set_index('transaction_id')
 
-prepare_df()
+
+    return y, x, z
+
+a,b,c = order_details()
+a
+b
+c
+
+'''
+This is where to fix right above this
+
+
 '''
 
-def order_details(df=prepare_df(), date_to_use='2020-03-23'):
-    '''
-    order_details:
-    1. filters data based on 'date_to_use'
-    2. aggregates each transaction at a product level
-    3. computes margin_per_product = price_price - distributor_price
-    4. computes Total_Margin_Order = margin_per_order x product_quantity
 
-    '''
-    order_details = df.loc[df.transaction_date.ge(date_to_use)]\
-    .groupby(['transaction_id','transaction_date','customer_last_name','customer_state',
-                           'customer_postal_code','product_name','product_quantity','product_weight','product_options'])\
-    .agg({'product_price_x_quantity':'sum','distributor_price':'sum','product_total':'sum','product_price':'sum','weight_total':'sum'})\
-    .assign(Margin_Per_Product = lambda x: x['product_price'] - x['distributor_price'])\
-    .reset_index('product_quantity')\
-    .assign(Total_Margin_Order = lambda x: x['product_quantity'] * x['Margin_Per_Product'])
-    
-    order_details = order_details[['product_quantity','product_price','weight_total','product_price_x_quantity','distributor_price','Margin_Per_Product','Total_Margin_Order']]
-    '''
-    order_summary_margin:
-    1. takes order_details & aggregates by first four levels to get summary for entire order
-    '''
-    order_summary_margin = order_details[['weight_total','product_price_x_quantity','Total_Margin_Order']].groupby(level=[0,1,2,3]).sum()
 
-    return order_summary_margin
-
-def order_summary_units(df=prepare_df(), date_to_use='2020-03-23'):
-    '''
-    order_summary_units:
-    1. dataframe to put all products in a list for a summary view
-    '''
-    order_summary_units = df.loc[df.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])['combined'].apply(', \n'.join)
-
-    return order_summary_units
 
 def order_discount(df=prepare_df(), date_to_use='2020-03-23'):
     '''
