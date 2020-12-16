@@ -53,14 +53,16 @@ def clean_df(df=df):
     #cleaning product_name
     df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
 
+    #add in coupons used to make sense of discount
+    df['coupon_normalized'] = df['coupons_used'].str.split(":").str[0]
+    
     #needed to fill in blanks
     df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
-
+    df['coupon_used?'] = np.where(df['coupon_normalized'].eq('-'),'No','Yes')
     # #pre_post = email blast, not when shipping changes were implemented
     # df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
 
     return df
-
 
 def clean_fed():
     '''
@@ -108,8 +110,7 @@ Shipping Document - where we pull in from the office sheet
 ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
                                      'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
 
-date_to_test = '2020-12-05'
-df.loc[:,:'category_code']
+date_to_test = '2020-04-05'
 
 def combine_df_price(df=df, start=date_to_test):
     """Return dataframe combined with transaction log & product df'
@@ -127,10 +128,11 @@ def combine_df_price(df=df, start=date_to_test):
     Dataframe shows all transactions since 2018, merged with pricing spreadsheet (price)
     '''
     y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
+    
     return y
 
+
 def order_details(df=combine_df_price()):
-    #:TODO this is where left off
     #order details
     y = df
     #product_price_x_quantity - multiples product_price x product_quantity from original dataframe
@@ -144,178 +146,60 @@ def order_details(df=combine_df_price()):
 
     y['net_margin_per_item'] = y['product_quantity'] * (y['product_price'] - y['distributor_price'])
 
-    #getting units in simple 
-    z = y.groupby('transaction_id')['product_units'].apply(', \n'.join)
+    return y
 
-    #order summary info
-    x = df.set_index('transaction_id').loc[:,:'category_code'].reset_index().drop_duplicates()
+def order_summary(df=order_details()):
+    x = df[['transaction_id','transaction_date','customer_last_name','shipping_total','discount_total','customer_state','customer_postal_code',
+            'shipping_state','shipping_postal_code','coupon_normalized','coupon_used?']].drop_duplicates()
 
-    #add in coupons used to make sense of discount
-    x['coupon_normalized'] = x['coupons_used'].str.split(":").str[0]
-    x['coupon_used?'] = np.where(x['coupon_normalized'].eq('-'),'No','Yes')
+    #put in shipping info - free, tier 1, tier 2 etc.
+    conditions = [x['shipping_total'].eq(0), \
+                x['shipping_total'].eq(5),\
+                x['shipping_total'].eq(10)]
+    choices = ['Free','$5','$10']  
 
-    #pull in shipping rate
-    x['shipping_total'] = 
+    x['Shipping_Tier'] = np.select(conditions, choices,default='Other')
+    x = x.set_index('transaction_id')
+    return x
+
+def order_details_agg(df=order_details()):
+    x = df
     
-    x = x[['transaction_id','transaction_date','shipping_state','shipping_postal_code','coupon_normalized','coupon_used','shipping_total']].set_index('transaction_id')
+    x = x.groupby('transaction_id').agg(Order_Weight=('weight_total','sum'),
+            Order_Revenue=('product_price_x_quantity','sum'),
+            Order_Margin=('net_margin_per_item','sum'))
+    return x
+
+def combine_detail_order_fedex():
+    c = pd.merge(order_details_agg(),order_summary(),left_index=True, right_index=True)
+    d = ship_log[['Order #','Actual Freight Expense']].drop_duplicates().rename(columns = {'Order #':'transaction_id'}).set_index('transaction_id')
+    
+    e = order_details()
+    e = e.groupby('transaction_id')['product_units'].apply(list)
+    
+    m = pd.merge(c,d, how='left',left_index=True,right_index=True)
+    
+    m = pd.merge(m,e, how='left',left_index=True,right_index=True)
+
+    m['Order_Margin_Minus_Shipping'] = m['Order_Margin'] + m['shipping_total'] - m['Actual Freight Expense']
+
+    m['Net_Order_Margin'] = m['Order_Margin_Minus_Shipping'] + m['discount_total']
+
+    m['Good_v_Bad'] = np.where(m['Net_Order_Margin'].ge(0),'Good','Bad')
+
+    return m
+#read in fedex file
 
 
-    return y, x, z
-
-a,b,c = order_details()
-a
-b
-c
-
-'''
-This is where to fix right above this
-
-
-'''
-
-
-
-
-def order_discount(df=prepare_df(), date_to_use='2020-03-23'):
-    '''
-    1. dataframe to pull all discounts used in a list for summary view
-    '''
-    order_discount = df.loc[df.transaction_date.ge(date_to_use)].groupby(['transaction_id','transaction_date','customer_last_name','customer_state'])\
-        .agg({'coupon_used?':lambda x: ', '.join(sorted(x.unique().tolist())),'coupon_normalized':lambda x: ', '.join(sorted(x.unique().tolist()))})
-
-    return order_discount
-
-def order_total():
-    '''
-    order_total:
-    1. concats order_summary_margin + order_summary_units to get master view 
-    2. combine Fedex Shipping Log
-    '''
-    order_total = pd.concat([order_details(),order_summary_units(), order_discount()],axis=1)
-    order_total = order_total[['combined','weight_total','coupon_used?','coupon_normalized','product_price_x_quantity','Total_Margin_Order']]
-
-    order_total_ship_log = pd.merge(order_total.reset_index().set_index('transaction_id'),
-                                    ship_log[['Order #','Actual Freight Expense']].drop_duplicates().set_index('Order #'),
-                                    how='left',
-                                    left_index=True,
-                                    right_index=True)
-
-    '''
-    discount_fix
-    1. pull in discounts to add back to compute net margin
-
-    '''
-    discount_fix = df[['transaction_id','discount_total']].drop_duplicates().set_index('transaction_id')
-
-    #pull in discount_fix
-    order_total_ship_log = pd.merge(order_total_ship_log,discount_fix, how='left', left_index=True, right_index=True)
-
-    #resetting index
-    order_total_ship_log.index = order_total_ship_log.index.set_names('Order #')
-    order_total_ship_log = order_total_ship_log.set_index('transaction_date',append=True)
-
-
-    transactions_with_free_shipping  = df[df['shipping_total'].eq(0)]['transaction_id']
-    transactions_with_discount_shipping = df[df['shipping_total'].eq(5)]['transaction_id']
-
-    #if shipping = 0 Free_Shipping
-    #if shipping = 5 Discounted
-    order_total_ship_log['Shipping_Tiers'] = np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_free_shipping),\
-        'Free_Shipping', (np.where(order_total_ship_log.index.get_level_values(0).isin(transactions_with_discount_shipping),\
-            'Discounted',"No_Shipping_Discount")))
-
-    return order_total_ship_log
-
-order_total = order_total()
-order_total.iloc[3]
-
-def net_margin(df_use=df):
-    if df_use['Shipping_Tiers'] == "Free_Shipping":
-        ##free shipping = 0 in shipping_total column
-        margin = df_use['Total_Margin_Order'] + \
-                    df_use['discount_total'] - \
-                    df_use['Actual Freight Expense']
-        return margin
-
-    elif df_use['Shipping_Tiers'] == 'Discounted':
-        ##discounted shipping = 0 in shipping_total column
-        margin = df_use['Total_Margin_Order'] + \
-                    df_use['discount_total'] + \
-                    5 - \
-                    df_use['Actual Freight Expense']
-        return margin
-
-    else:
-        margin = df_use['Total_Margin_Order'] + \
-                    df_use['discount_total'] + \
-                    10 - \
-                    df_use['Actual Freight Expense']
-        return margin
-
-def calculate_net_margin():
-    order_total['Net_Margin'] = order_total.apply(net_margin, axis=1)
-    #is Net_Margin >= to 0?
-    order_total['Positive/Negative'] = np.where(order_total['Net_Margin'].ge(0),'Good','Bad')
-
-    #was this discounted
-    order_total['Discount'] = np.where(order_total['discount_total'].ne(0),"Yes","No")
-
-    order_total['Shipping_Discount?'] = np.where(order_total['Shipping_Tiers'].eq('No_Shipping_Discount'),"No",'Yes')
-
-    return order_total
- 
-calculate_net_margin()
-'''
-
-'''
-summary:
-cover sheet
-'''
-
-# :TODO fix from here down
-'''
-Fix from here down ->
-
-'''
-#summary of actions
-summary = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()]
-
-summary = summary[['product_price_x_quantity','Total_Margin_Order','Actual Freight Expense',"Net_Margin"]].sum()
-
-summary = summary.rename({'product_price_x_quantity':'Total Revenue (not including shipping)',
-                          'Total_Margin_Order':'Margin on Product v. Distributor Cost',
-                          'Actual Freight Expense':'Actual Freight Expense',
-                         "Net_Margin" : "Net Margin after Shipping"})
-
-
-
-df_list = [summary, order_total_ship_log, order_details, order_total ]
-df_names = ["Summary",'Margin per Order', 'Details','Backup']
-workbook_name = "Web Orders as of .xlsx"
+#sanity check this
+combine_detail_order_fedex()
 
 
 '''
 DataFrame for plotting scatterplots
 '''
 plot_df = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'].notnull()].reset_index()
-'''
-Pulling in Fedex pricing zones
-'''
-#create lookup table from FedEx bill; point is to join states to pricing zones for easier aggregation
-k = fed.loc[fed['Pricing zone'].notnull() &
-            fed['Pricing zone'].ne('Non Zone')][['Pricing zone','Recipient State/Province','Shipment Tracking Number']].drop_duplicates()
-k['Pricing zone'] = k['Pricing zone'].astype(int)
-kk = k.groupby(['Recipient State/Province','Pricing zone']).agg(count = ('Shipment Tracking Number','size'))
-kk = kk.sort_values(by=['Recipient State/Province','count'],ascending=[True,False]).groupby(level=0).head(1)
-kk = kk.reset_index().drop('count',axis=1)
-kl = kk.groupby('Pricing zone')['Recipient State/Province'].apply(list).reset_index()
-kl['Zone-State'] = kl['Pricing zone'].astype(str)+ "-" + kl['Recipient State/Province'].astype(str)
-kkk = pd.merge(kk.set_index('Pricing zone'), kl.set_index('Pricing zone'), left_index=True, right_index=True).reset_index()
 
-'''
-plot:
--contains order_total_ship_log + FedEx shipping locations 
-'''
 plot = pd.merge(plot_df, kkk[['Recipient State/Province_x','Zone-State']], left_on=['customer_state'], right_on=['Recipient State/Province_x']).drop('Recipient State/Province_x', axis=1)
 
 def joint_plot_function(df_master=plot, x='product_price_x_quantity', y='Net_Margin', hue='Shipping_Discount?', hue_option='No'):
