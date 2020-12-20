@@ -1,4 +1,5 @@
 '''
+
 Import & normalize retail sales data
 
 '''
@@ -110,7 +111,7 @@ Shipping Document - where we pull in from the office sheet
 ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
                                      'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
 
-date_to_test = '2020-04-05'
+date_to_test = '2020-08-01'
 
 def combine_df_price(df=df, start=date_to_test):
     """Return dataframe combined with transaction log & product df'
@@ -191,8 +192,10 @@ def combine_detail_order_fedex():
 
 
 #sanity check this get it right order
-combine_detail_order_fedex()
+x = combine_detail_order_fedex()
+x.iloc[3]
 
+sns.scatterplot(x='Order_Revenue',y='Net_Order_Margin',hue='coupon_normalized',data=x)
 
 '''
 DataFrame for plotting scatterplots
