@@ -93,7 +93,7 @@ Pricing Spreadsheet to Pull up Distributor Pricing
 '''
 #will need to update price if pricing has been updated
 #update the 
-price = pd.read_excel('Product_Pricing.xlsx')
+price = pd.read_excel('Product_Pricing.xlsx',engine='openpyxl')
 
 def check_pricing_spreadsheet():
     #check for new products / price combo
@@ -109,9 +109,9 @@ check_pricing_spreadsheet()
 Shipping Document - where we pull in from the office sheet
 '''
 ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
-                                     'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
+                                     'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'), engine='openpyxl')
 
-date_to_test = '2020-08-01'
+date_to_test = '2020-10-01'
 
 def combine_df_price(df=df, start=date_to_test):
     """Return dataframe combined with transaction log & product df'
@@ -197,6 +197,12 @@ x.iloc[3]
 
 sns.scatterplot(x='Order_Revenue',y='Net_Order_Margin',hue='coupon_normalized',data=x)
 
+sns.relplot(data=x,x='Order_Revenue',y='Net_Order_Margin',hue='coupon_normalized',style='Shipping_Tier', col='coupon_used?', kind='scatter');
+
+sns.jointplot(data=x, x='Order_Revenue',y='Net_Order_Margin', hue='coupon_normalized');
+
+sns.displot(data=x, x='Order_Revenue',col='coupon_used?');
+
 '''
 DataFrame for plotting scatterplots
 '''
@@ -204,7 +210,7 @@ plot_df = order_total_ship_log.loc[order_total_ship_log['Actual Freight Expense'
 
 plot = pd.merge(plot_df, kkk[['Recipient State/Province_x','Zone-State']], left_on=['customer_state'], right_on=['Recipient State/Province_x']).drop('Recipient State/Province_x', axis=1)
 
-def joint_plot_function(df_master=plot, x='product_price_x_quantity', y='Net_Margin', hue='Shipping_Discount?', hue_option='No'):
+def joint_plot_function(df_master, x='product_price_x_quantity', y='Net_Margin', hue='Shipping_Discount?', hue_option='No'):
     '''
 
     Parameters
@@ -220,7 +226,7 @@ def joint_plot_function(df_master=plot, x='product_price_x_quantity', y='Net_Mar
     creates plot with scatterplot & histograms; allows for 'hue' argument
 
     '''
-    df_master = df_master.loc[df_master['weight_total'].lt(45)]
+    df_master = df_master.loc[df_master['Order_Weight'].lt(45)]
     g = sns.JointGrid(x=x, y=y, data=df_master)
     g_1 = df_master.loc[df_master[hue].eq(hue_option)]
     g_2 = df_master.loc[df_master[hue].ne(hue_option)]
@@ -240,7 +246,7 @@ def joint_plot_function(df_master=plot, x='product_price_x_quantity', y='Net_Mar
     plt.suptitle('Impact of ' + hue + ' on ' + x + ' and ' + y)
     plt.savefig('Impact of ' + hue + ' on ' + x + ' and ' + y)
 
-joint_plot_function()
+joint_plot_function(df_master=x, x='Order_Revenue', y='Net_Order_Margin', hue='coupon_used?',hue_option='No')
 #:TODO have to set fig size
 
 
