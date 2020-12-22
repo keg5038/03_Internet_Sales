@@ -198,7 +198,8 @@ x.iloc[3]
 sns.scatterplot(x='Order_Revenue',y='Net_Order_Margin',hue='coupon_normalized',data=x)
 
 x.iloc[3]
-sns.relplot(data=x,x='Order_Revenue',y='Net_Order_Margin',hue='coupon_normalized',style='Shipping_Tier', col='coupon_used?', kind='scatter');
+sns.relplot(data=x,x='Order_Revenue',y='Net_Order_Margin',hue='coupon_normalized',
+    style='Shipping_Tier', col='coupon_used?', kind='scatter');
 
 sns.jointplot(data=x, x='Order_Revenue',y='Net_Order_Margin', hue='coupon_normalized');
 
