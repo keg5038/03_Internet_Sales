@@ -35,92 +35,152 @@ today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
 os.chdir(os.path.join(os.getenv('HOME'),
     'Dropbox/BKM - Marketing/Web Sales'))
 
-
-df = pd.concat([pd.read_csv(f) for f in glob ('./CSV_Files_2020-02/*.csv')])
-print(df)
 '''
-Cleaning for Online Orders Sheet
-'''
-df['transaction_date'] = pd.to_datetime(df.transaction_date)
-
-#dropping duplicates in case dates of pulls are messed up
-df = df.drop_duplicates()
-#have to sort to ffill
-df = df.sort_values(['transaction_id','transaction_date'])
-#way to fillna only based on transaction_id
-df.loc[:,:'category_code'] = df.loc[:,:'category_code'].fillna(df.groupby('transaction_id').ffill())
-#cleaning product_name
-df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
-
-#added in because
-#product_price_x_quantity - multiples product_price x product_quantity from original dataframe
-df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
-
-#needed to fill in blanks
-df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
-
-#pre_post = email blast, not when shipping changes were implemented
-df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
-
+Issue is somewhere along the way I'm overwriting the different products
 
 '''
-Cleaning FedEx File
 
-'''
-fed = pd.concat([pd.read_csv(f) for f in glob ('./FedEx_Files/*.csv')])
+def open_file():
+    """[Read in CSV files from FoxyCart data ]
+    """    
+    df = pd.concat([pd.read_csv(f) for f in glob ('./CSV_Files_2020-02/*.csv')])
 
-def date_cleaner(df):
-    #fixes dates for fedex file
-    cols = ['Shipment Date(mm/dd/yyyy)','Shipment Delivery Date (mm/dd/yyyy)','Invoice Date (mm/dd/yyyy)']
-    for col in cols:
-        fed[col] = pd.to_datetime(fed[col],format="%m/%d/%Y")
+    #convert transaction_date to date
+    
+    df['transaction_date'] = pd.to_datetime(df.transaction_date)
 
-    return fed
+    #filtering to look at things post 2018
+    df = df.loc[df['transaction_date'].ge('2018')]
 
-fed = date_cleaner(fed)
+    #dropping duplicates in case dates of pulls are messed up
+    df = df.drop_duplicates()
+    #have to sort to ffill
+    df = df.sort_values(['transaction_id','transaction_date'])
+    #way to fillna only based on transaction_id
+    df.loc[:,:'category_code'] = df.loc[:,:'category_code'].fillna(df.groupby('transaction_id').ffill())
+    #cleaning product_name
+    df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
 
-fed = fed.rename(columns={'Shipment Date(mm/dd/yyyy)':'Date_Shipment',
-                              'Shipment Delivery Date (mm/dd/yyyy)':'Date_Delivery',
-                              'Invoice Date (mm/dd/yyyy)':'Date_Invoice'})
-fed = fed.drop_duplicates().sort_values('Date_Invoice')
+    #added in because
+    #product_price_x_quantity - multiples product_price x product_quantity from original dataframe
+    df['product_price_x_quantity'] = df['product_price'] * df['product_quantity']
+
+    #needed to fill in blanks
+    df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
+
+    #pre_post = email blast, not when shipping changes were implemented
+    df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
+
+    return df
+open_file().to_excel("sdfdlkjadfkj.xlsx")
+y = open_file()
+
+
+y.loc[y['transaction_id'].value_counts() >2]
+
+y.groupby('transaction_id').filter(lambda x: len(x) > 2)
+
+def fed_ex():
+    '''
+    Cleaning FedEx File - not sure if used later
+
+    '''
+    fed = pd.concat([pd.read_csv(f) for f in glob ('./FedEx_Files/*.csv')])
+
+    def date_cleaner(df):
+        #fixes dates for fedex file
+        cols = ['Shipment Date(mm/dd/yyyy)','Shipment Delivery Date (mm/dd/yyyy)','Invoice Date (mm/dd/yyyy)']
+        for col in cols:
+            fed[col] = pd.to_datetime(fed[col],format="%m/%d/%Y")
+
+        return fed
+
+    fed = date_cleaner(fed)
+
+    fed = fed.rename(columns={'Shipment Date(mm/dd/yyyy)':'Date_Shipment',
+                                'Shipment Delivery Date (mm/dd/yyyy)':'Date_Delivery',
+                                'Invoice Date (mm/dd/yyyy)':'Date_Invoice'})
+    fed = fed.drop_duplicates().sort_values('Date_Invoice')
 
 '''
 Pricing Spreadsheet to Pull up Distributor Pricing
 '''
-price = pd.read_excel('Product_Pricing.xlsx')
+def open_price():
+    price = pd.read_excel('Product_PricingV2.xlsx')
+    return price
 
-'''
-Shipping Document - where we pull in from the office sheet
-'''
-ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
-                                     'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
+def ship_log():
+    '''
+    Shipping Document - where we pull in from the office sheet
+    '''
+    ship_log =pd.read_excel(os.path.join(os.getenv('HOME'),
+                                        'Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log (SRTWP 11.06.06).xlsx'))
+    ship_log = ship_log[['Order #','Actual Freight Expense']].set_index('Order #')
+    return ship_log
 
-'''
-Fedex sheet for labels
-'''
-'''label = pd.read_csv(os.path.join(os.getenv('HOME'),
-                                     'Dropbox/BKM - Marketing/Web Sales/FedEx_Files/fedex_upload_master.csv'))'''
+x = pd.merge(open_file(),open_price(),how='left',on=['product_name','product_options','product_price','product_weight'])
+
+x.tail(10)
+
+def combine():
+    
+    #merge all FoxyCart files with pricing spreadsheet
+    x = pd.merge(open_file(),open_price(),how='left',on=['product_name','product_options','product_price','product_weight'])
+
+    #look for missing product_name or distributor_price
+    #if anything found, run 
+    x.loc[x['product_name'].isnull() | x['distributor_price'].isnull()].to_excel("Missing Products.xlsx")
+
+    y = pd.merge(x.set_index('transaction_id'),ship_log(),how='left',left_index=True, right_index=True)\
+        .reset_index()\
+        .rename(columns={'index':'transaction_id'})
+
+    y.to_excel("lkjklsdjf.xlsx")
+    #create new columns for later aggregations
+    y['combined'] = y['product_normalized'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
+    y['units_total'] = y['product_quantity'] * y['units_normalized']
+    #this was wrong - make sure weight_total was right
+    y['weight_total'] = y['product_quantity'] * y['product_weight']
+
+   
+    #add in coupons used to make sense of discount
+    y['coupon_normalized'] = np.where(y['coupons_used'].str.contains(':'), 
+                                    y['coupons_used'].str.split(":").str[0], 
+                                    '')
+    #margin per item
+    y['margin_per_product'] = (y['product_price'] - y['distributor_price']) * y['product_quantity']
+
+    #margin per order
+    y['margin_per_order'] = y.groupby('transaction_id')['margin_per_product'].transform('sum')
+
+    #income at order level
+    y['income_order'] = y['margin_per_order'] + y['shipping_total'] + y['discount_total'] - y['Actual Freight Expense']
 
 
-'''
-This is to pull info for Andrew
-'''
-# x is just filtered dataframed
-#changed 6/4
-x = df.loc[df['transaction_date'].ge('2018')]
+    #return any missing freight expenses for further examination
+    y.loc[y['Actual Freight Expense'].isnull() & y['transaction_date'].ge('2020')].to_excel("Missing Fedex.xlsx")
 
-'''
-y - 
-Dataframe shows all transactions since 2018, merged with pricing spreadsheet (price)
-'''
-y = pd.merge(x,price,how='left',on=['product_name','product_options','product_price','product_weight'])
-y['combined'] = y['product_name'].astype(str) + "-" + y['product_quantity'].astype(str) + " Units"
-y['units_total'] = y['product_quantity'] * y['units_normalized']
-#this was wrong - make sure weight_total was right
-y['weight_total'] = y['product_quantity'] * y['product_weight']
+    return y
 
-#add in coupons used to make sense of discount
-y['coupon_normalized'] = y['coupons_used'].str.split(":").str[0].unique()
+
+def missing_product_fix():
+    #only run if combine() shows values for Missing Products
+
+    #need to look at any new combo of product_name, product_options, price etc.
+    #will need to adjust product_pricing excel doc
+    #merge df from FoxyCart + ProductPricing
+    #if anything is NaN in 'product_normalized' or 'distributor_price' needs to be fixed
+    pd.merge(open_file(),open_price(),how='left',on=['product_name','product_options','product_price','product_weight'])\
+        .groupby(['product_normalized','product_name','product_options','product_price','product_weight','distributor_price'],dropna=False)\
+        .agg(MaxDate = ('transaction_date','max')).reset_index()\
+        .to_excel('Product_PricingV2.xlsx')
+
+y = combine().to_excel("lkjklajsdjkf.xlsx")
+
+
+def order_details(date = '2020-03-23'):
+
+
 
 
 y.iloc[3]
