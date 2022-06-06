@@ -32,8 +32,7 @@ idx = pd.IndexSlice
 
 today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
 
-os.chdir(os.path.join(os.getenv('HOME'),
-    'Dropbox/BKM - Marketing/Web Sales'))
+os.chdir(os.path.join('/mnt/c/Users/keg5038/Dropbox/BKM - Marketing/Web Sales'))
 
 '''
 Issue is somewhere along the way I'm overwriting the different products
@@ -72,9 +71,9 @@ def open_file():
     df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
 
     return df
-open_file().to_excel("sdfdlkjadfkj.xlsx")
+# open_file().to_excel("sdfdlkjadfkj.xlsx")
 y = open_file()
-
+y
 
 y.loc[y['transaction_id'].value_counts() >2]
 
