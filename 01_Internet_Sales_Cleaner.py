@@ -75,7 +75,6 @@ def open_file():
 y = open_file()
 y
 
-y.loc[y['transaction_id'].value_counts() >2]
 
 y.groupby('transaction_id').filter(lambda x: len(x) > 2)
 
