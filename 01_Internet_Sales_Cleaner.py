@@ -3,23 +3,28 @@ Import & normalize retail sales data
 
 '''
 
-from os.path import join
 import pandas as pd
 import numpy as np
 import datetime as dt
 import os
 import matplotlib.pyplot as plt
 import matplotlib.dates as md
+from plotly.subplots import make_subplots
+from sympy import group
 from xlsxwriter.utility import xl_rowcol_to_cell
 import matplotlib.ticker as ticker
 import seaborn as sns
 import calendar
-from pandas.tseries.offsets import MonthEnd
-from numbers import Number
-import a_functions as a_fun
-import weekly_transactions
+from scipy import stats
+from pandas.tseries.offsets import MonthBegin, MonthEnd
+import pandas.io.formats.excel
+import sidetable
 import math
-from glob import glob
+import plotly.express as px
+import plotly
+import pathlib
+import sidetable as stb
+
 
 
 sns.set_style('whitegrid')
@@ -73,7 +78,17 @@ def open_file():
     return df
 # open_file().to_excel("sdfdlkjadfkj.xlsx")
 y = open_file()
-y
+sns.scatterplot(y, x=y['transaction_date', y=y['transaction_id'].unique()])
+
+y['transaction_date'].dt.strftime("%Y-%m-%d")
+t = y.groupby(y['transaction_date'].dt.strftime("%Y-%m-%d")).agg(NumofTran = ('transaction_id','nunique')).reset_index()
+
+sns.scatterplot(t, x='transaction_date', y= 'NumofTran')
+
+px.scatter(t,x='transaction_date', y= 'NumofTran')
+
+y.loc[:,y.columns.str.contains('nam',case=False)]
+y[['customer_email','customer_first_name','customer_last_name']].drop_duplicates()
 
 y.loc[y['transaction_id'].value_counts() >2]
 
