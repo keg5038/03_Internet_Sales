@@ -52,7 +52,7 @@ def open_file():
     df = df.loc[df['transaction_date'].ge('2018')]
 
     #dropping duplicates in case dates of pulls are messed up
-    df = df.drop_duplicates()
+    #new 2022-06-08 - > can't have drop duplicates here, it's deleting everything
     #have to sort to ffill
     df = df.sort_values(['transaction_id','transaction_date'])
     #way to fillna only based on transaction_id
@@ -66,6 +66,7 @@ def open_file():
 
     #needed to fill in blanks
     df = df.apply(lambda x: x.fillna(0) if x.dtype.kind in 'biufc' else x.fillna('-'))
+    # df = df.drop_duplicates()
 
     #pre_post = email blast, not when shipping changes were implemented
     df['Pre_Post'] = np.where(df['transaction_date'].ge('2020-03-17'),"Post","Pre")
@@ -73,11 +74,9 @@ def open_file():
     return df
 # open_file().to_excel("sdfdlkjadfkj.xlsx")
 y = open_file()
-y
+y.to_excel("test20220608v2.xlsx")
 
-
-y.groupby('transaction_id').filter(lambda x: len(x) > 2)
-
+1930248339
 def fed_ex():
     '''
     Cleaning FedEx File - not sure if used later
