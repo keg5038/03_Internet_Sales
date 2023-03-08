@@ -1,3 +1,4 @@
+from heapq import merge
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -31,11 +32,6 @@ today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
 
 os.chdir(os.path.join('/mnt/c/Users/keg5038/Dropbox/BKM - Marketing/Web Sales'))
 
-'''
-Issue is somewhere along the way I'm overwriting the different products
-
-'''
-pd.concat([pd.read_csv(f) for f in glob.glob('./CSV_Files_2020-02/*.csv')])
 
 def open_file():
     """[Read in CSV files from FoxyCart data ]
@@ -46,15 +42,20 @@ def open_file():
     
     df['transaction_date'] = pd.to_datetime(df.transaction_date)
 
-    #filtering to look at things post 2018
-    df = df.loc[df['transaction_date'].ge('2018')]
-
-    #dropping duplicates in case dates of pulls are messed up
-    df = df.drop_duplicates()
+    #have to do fillna here because otherwise it's getting wiped out
     #have to sort to ffill
     df = df.sort_values(['transaction_id','transaction_date'])
     #way to fillna only based on transaction_id
     df.loc[:,:'category_code'] = df.loc[:,:'category_code'].fillna(df.groupby('transaction_id').ffill())
+
+    #filtering to look at things post 2018
+    df = df.loc[df['transaction_date'].ge('2018')]
+
+    df = df.drop_duplicates()
+
+    #dropping duplicates in case dates of pulls are messed up
+    # df = df.drop_duplicates()
+    
     #cleaning product_name
     df['product_name'] = df['product_name'].replace('\s+', ' ', regex=True)
 
@@ -70,4 +71,29 @@ def open_file():
 
     return df
 # open_file().to_excel("sdfdlkjadfkj.xlsx")
-y = open_file()
+df = open_file()
+
+
+# (df.loc[df.transaction_date.ge('2022-10-01')].groupby(['product_name','product_code','product_options','product_weight','product_price'])
+#     .agg(MaxDate = ('transaction_date','max'))
+#     .sort_values(['product_name'])
+#     .reset_index()).to_excel('ProductsSoldSMALL.xlsx')
+
+
+df[['transaction_date','transaction_id','shipping_first_name','shipping_last_name','shipping_address1','shipping_city','shipping_state','shipping_postal_code','customer_email','shipping_phone','product_name','product_code','product_quantity']]
+
+def ship_log():
+    '''
+    Shipping Document - where we pull in from the office sheet
+    '''
+    ship_log =pd.read_excel(os.path.join('/mnt/c/Users/keg5038/Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log.xlsx'))
+    return ship_log
+
+
+y = ship_log()
+
+df.tail(10)
+y.tail(10)
+
+y['transaction_id']
+df.loc[df['transaction_id'].isin([y['transaction_id']])]
