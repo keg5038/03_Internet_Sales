@@ -1,4 +1,4 @@
-from heapq import merge
+# from heapq import merge
 import pandas as pd
 import numpy as np
 import datetime as dt
@@ -21,6 +21,9 @@ import plotly
 import pathlib
 import sidetable as stb
 import glob
+import openpyxl
+
+
 
 #new to change width
 pd.set_option('display.width', 400)
@@ -28,7 +31,10 @@ pd.set_option('display.max_columns', 20)
 
 idx = pd.IndexSlice
 
-today = dt.datetime.today().strftime("%m/%d/%Y - %H-%M")
+today = dt.datetime.today().strftime("%m/%d/%Y - %I:%M %p")
+
+def today_fun():
+    return dt.datetime.today().strftime("%m/%d/%Y - %I:%M %p")
 
 os.chdir(os.path.join('/mnt/c/Users/keg5038/Dropbox/BKM - Marketing/Web Sales'))
 
@@ -42,11 +48,13 @@ def open_file():
     
     df['transaction_date'] = pd.to_datetime(df.transaction_date)
 
+
     #have to do fillna here because otherwise it's getting wiped out
     #have to sort to ffill
     df = df.sort_values(['transaction_id','transaction_date'])
     #way to fillna only based on transaction_id
     df.loc[:,:'category_code'] = df.loc[:,:'category_code'].fillna(df.groupby('transaction_id').ffill())
+    df['transaction_id'] = df['transaction_id'].astype(int)
 
     #filtering to look at things post 2018
     df = df.loc[df['transaction_date'].ge('2018')]
@@ -79,21 +87,29 @@ df = open_file()
 #     .sort_values(['product_name'])
 #     .reset_index()).to_excel('ProductsSoldSMALL.xlsx')
 
-
-df[['transaction_date','transaction_id','shipping_first_name','shipping_last_name','shipping_address1','shipping_city','shipping_state','shipping_postal_code','customer_email','shipping_phone','product_name','product_code','product_quantity']]
+columns = ['transaction_date','transaction_id','shipping_first_name','shipping_last_name','shipping_address1','shipping_city','shipping_state','shipping_postal_code','customer_email','shipping_phone','product_name','product_code','product_quantity']
+df[columns]
 
 def ship_log():
     '''
     Shipping Document - where we pull in from the office sheet
     '''
-    ship_log =pd.read_excel(os.path.join('/mnt/c/Users/keg5038/Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log.xlsx'))
+    ship_log =pd.read_excel(os.path.join('/mnt/c/Users/keg5038/Dropbox/Shared Folder - Birkett Mills Office/Fedex Shipping Log.xlsx'),sheet_name='Sheet1')
+    # ship_log['transaction_id'] = ship_log['transaction_id'].astype(str)
+    # ship_log['transaction_id'] = ship_log['transaction_id'].str.strip(".0")
     return ship_log
 
 
-y = ship_log()
+ship_log = ship_log()
 
-df.tail(10)
-y.tail(10)
+to_update = df.loc[~df['transaction_id'].isin(ship_log.transaction_id.unique())][columns]
 
-y['transaction_id']
-df.loc[df['transaction_id'].isin([y['transaction_id']])]
+to_update
+
+pd.concat([ship_log,to_update],axis=0).tail(50)
+
+def update_spreadsheet():
+
+
+
+today_fun()
